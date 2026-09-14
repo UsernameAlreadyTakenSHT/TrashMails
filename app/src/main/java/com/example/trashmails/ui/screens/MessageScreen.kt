@@ -1,7 +1,14 @@
 package com.example.trashmails.ui.screens
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,6 +115,13 @@ private fun HtmlBody(html: String) {
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
             WebView(ctx).apply {
+                // A tapped link leaves the app: nothing ever navigates inside the mail view.
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                        openLink(ctx, request.url)
+                        return true
+                    }
+                }
                 settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
@@ -117,6 +131,25 @@ private fun HtmlBody(html: String) {
         },
         update = { it.loadDataWithBaseURL(null, withViewport(html), "text/html", "utf-8", null) },
     )
+}
+
+/**
+ * Opens a link from an email in the browser (or the mail app for mailto:). Any other scheme is
+ * dropped: the sender must not be able to fire intent://, tel: or another app's deep link.
+ */
+private fun openLink(context: Context, uri: Uri) {
+    val web = when (uri.scheme?.lowercase()) {
+        "http", "https" -> true
+        "mailto" -> false
+        else -> return
+    }
+    val intent = Intent(Intent.ACTION_VIEW, uri)
+    if (web) intent.addCategory(Intent.CATEGORY_BROWSABLE)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
+    }
 }
 
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
