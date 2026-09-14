@@ -9,6 +9,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 object Http {
+    /** Error bodies are kept for the provider to explain the failure, but never at full size. */
+    private const val MAX_ERROR_BODY = 2_000
+
     private val json = "application/json; charset=utf-8".toMediaType()
 
     val client: OkHttpClient = OkHttpClient.Builder()
@@ -31,7 +34,7 @@ object Http {
     private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host)
+            if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host, text.take(MAX_ERROR_BODY))
             text
         }
     }
@@ -48,5 +51,5 @@ fun sanitizeName(raw: String?): String? =
         ?.filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
         ?.takeIf { it.isNotBlank() }
 
-/** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401). */
-class HttpException(val code: Int, host: String) : ProviderException("HTTP $code from $host")
+/** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401), [body] explain. */
+class HttpException(val code: Int, host: String, val body: String = "") : ProviderException("HTTP $code from $host")

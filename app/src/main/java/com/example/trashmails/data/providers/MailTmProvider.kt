@@ -45,7 +45,14 @@ class MailTmProvider : MailProvider {
 
     private suspend fun jwt(inbox: Inbox, refresh: Boolean = false): String {
         if (!refresh) jwts[inbox.id]?.let { return it }
-        val token = JSONObject(Http.postJson("$BASE/token", credentials(inbox))).getString("token")
+        val reply = try {
+            Http.postJson("$BASE/token", credentials(inbox))
+        } catch (e: HttpException) {
+            // Rejected credentials: the account was deleted (by mail.tm after inactivity, or elsewhere).
+            if (e.code == 401) throw ProviderException("This mail.tm account no longer exists: remove the address")
+            throw e
+        }
+        val token = JSONObject(reply).getString("token")
         jwts[inbox.id] = token
         return token
     }
@@ -70,7 +77,7 @@ class MailTmProvider : MailProvider {
             JSONObject(Http.postJson("$BASE/accounts", body))
         } catch (e: HttpException) {
             throw when (e.code) {
-                422 -> ProviderException("This address is already taken")
+                422 -> ProviderException(violationMessage(e.body) ?: "This address is already taken")
                 429 -> ProviderException("mail.tm is rate limiting: try again in a moment")
                 else -> e
             }
@@ -115,6 +122,23 @@ class MailTmProvider : MailProvider {
         authed(inbox) { h -> Http.delete("$BASE/messages/${summary.id}", h) }
         return true
     }
+
+    /**
+     * The reason of a 422, from the API Platform error body: the violation messages when there
+     * are some ("address: This value is already used."), else the description / detail line.
+     */
+    private fun violationMessage(body: String): String? = runCatching {
+        val json = JSONObject(body)
+        val violations = json.optJSONArray("violations")
+        if (violations != null && violations.length() > 0) {
+            (0 until violations.length()).joinToString("; ") { i ->
+                val v = violations.getJSONObject(i)
+                listOf(v.optString("propertyPath"), v.optString("message")).filter { it.isNotBlank() }.joinToString(": ")
+            }
+        } else {
+            json.optString("hydra:description").ifBlank { json.optString("detail") }
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "mail.tm: $it" }
 
     private fun parseDate(iso: String): Long =
         runCatching { OffsetDateTime.parse(iso).toInstant().toEpochMilli() }
