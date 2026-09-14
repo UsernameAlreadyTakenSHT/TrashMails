@@ -2,6 +2,7 @@
 
 > Personal project, built with AI assistance (Claude Code). No store release is planned: releases are
 > published here on GitHub only (installable with [Obtainium](https://github.com/ImranR98/Obtainium)).
+> See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 Android app to create and read disposable email inboxes from free providers:
 
