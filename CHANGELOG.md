@@ -1,8 +1,5 @@
 # Changelog
 
-All releases are published on GitHub with a signed APK (same key throughout, so each version
-installs over the previous one).
-
 ## v0.2.0 — 2026-09-14
 
 New providers, one removed from service.
