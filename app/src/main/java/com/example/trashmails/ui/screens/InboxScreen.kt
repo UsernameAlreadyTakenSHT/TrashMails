@@ -47,6 +47,7 @@ fun InboxScreen(
     messages: List<MailSummary>,
     loading: Boolean,
     loaded: Boolean,
+    refreshHint: String,
     error: String?,
     notice: String?,
     onBack: () -> Unit,

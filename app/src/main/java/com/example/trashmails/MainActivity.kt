@@ -69,6 +69,7 @@ private fun App(vm: MailViewModel) {
             messages = vm.messages,
             loading = vm.listLoading,
             loaded = vm.listLoaded,
+            refreshHint = vm.refreshHint,
             error = vm.error,
             notice = vm.notice,
             onBack = vm::back,

@@ -10,7 +10,17 @@ data class Settings(
     val loadImages: Boolean = false,
     /** Show the link's address and ask before leaving the app. */
     val confirmLinks: Boolean = true,
-)
+    /** Seconds between two automatic listings of the open inbox; 0 lists only on demand. */
+    val pollIntervalSec: Int = 60,
+) {
+    val pollIntervalMs: Long get() = pollIntervalSec * 1000L
+    val autoRefresh: Boolean get() = pollIntervalSec > 0
+
+    companion object {
+        /** Choices offered for [pollIntervalSec], with their labels. */
+        val POLL_INTERVALS = listOf(30 to "Every 30 s", 60 to "Every minute", 300 to "Every 5 min", 0 to "Manual only")
+    }
+}
 
 /** Persistence of [Settings] (SharedPreferences). */
 class SettingsStore(context: Context) {
@@ -22,6 +32,7 @@ class SettingsStore(context: Context) {
             renderHtml = prefs.getBoolean(RENDER_HTML, defaults.renderHtml),
             loadImages = prefs.getBoolean(LOAD_IMAGES, defaults.loadImages),
             confirmLinks = prefs.getBoolean(CONFIRM_LINKS, defaults.confirmLinks),
+            pollIntervalSec = prefs.getInt(POLL_INTERVAL, defaults.pollIntervalSec),
         )
     }
 
@@ -30,6 +41,7 @@ class SettingsStore(context: Context) {
             .putBoolean(RENDER_HTML, s.renderHtml)
             .putBoolean(LOAD_IMAGES, s.loadImages)
             .putBoolean(CONFIRM_LINKS, s.confirmLinks)
+            .putInt(POLL_INTERVAL, s.pollIntervalSec)
             .apply()
     }
 
@@ -37,5 +49,6 @@ class SettingsStore(context: Context) {
         const val RENDER_HTML = "render_html"
         const val LOAD_IMAGES = "load_images"
         const val CONFIRM_LINKS = "confirm_links"
+        const val POLL_INTERVAL = "poll_interval_sec"
     }
 }

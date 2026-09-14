@@ -97,6 +97,14 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun canDeleteMessages(inbox: Inbox) = providerFor(inbox).canDeleteMessages
 
+    /** One line for the inbox empty state: how the list gets refreshed. */
+    val refreshHint: String
+        get() = when (val s = settings.pollIntervalSec) {
+            0 -> "Tap refresh to check for mail."
+            60 -> "Auto-refresh every minute."
+            else -> if (s < 60) "Auto-refresh every $s s." else "Auto-refresh every ${s / 60} min."
+        }
+
     /** The inbox the current screen belongs to, if any. */
     private fun currentInbox(): Inbox? = when (val s = screen) {
         is Screen.InboxDetail -> s.inbox
@@ -135,8 +143,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(s: Settings) {
+        val intervalChanged = s.pollIntervalSec != settings.pollIntervalSec
         settings = s
         settingsStore.save(s)
+        if (intervalChanged) currentInbox()?.let { startPolling(it, immediate = false) }
     }
 
     fun refreshQuota() {
@@ -274,20 +284,24 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Lists [inbox] then again every [POLL_INTERVAL_MS] until [stopPolling]. With [immediate] false
-     * the first listing waits for the interval to elapse since the last one of the same inbox.
+     * Lists [inbox] then again at the interval chosen in [settings] until [stopPolling] (once only
+     * in manual mode). With [immediate] false the first listing waits for the interval to elapse
+     * since the last one of the same inbox.
      */
     private fun startPolling(inbox: Inbox, immediate: Boolean = true) {
         stopPolling()
         if (!foreground) return
+        val interval = settings.pollIntervalMs
         pollJob = viewModelScope.launch {
             if (!immediate && lastFetchKey == inbox.key) {
-                val wait = lastFetchAt + POLL_INTERVAL_MS - System.currentTimeMillis()
+                if (!settings.autoRefresh) return@launch
+                val wait = lastFetchAt + interval - System.currentTimeMillis()
                 if (wait > 0) delay(wait)
             }
             while (isActive) {
                 fetch(inbox)
-                delay(POLL_INTERVAL_MS)
+                if (!settings.autoRefresh) return@launch
+                delay(interval)
             }
         }
     }
@@ -304,7 +318,6 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun clearNotice(shown: String) { if (notice == shown) notice = null }
 
     private companion object {
-        const val POLL_INTERVAL_MS = 60_000L
         const val MANUAL_REFRESH_MIN_MS = 30_000L
     }
 }
