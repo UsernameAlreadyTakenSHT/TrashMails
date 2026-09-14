@@ -39,6 +39,7 @@ private fun App(vm: MailViewModel) {
             quotas = vm.quotas,
             onOpenCreate = vm::refreshQuota,
             onDismissError = vm::clearError,
+            onCancelCreate = vm::cancelCreate,
             onOpen = vm::openInbox,
             onDelete = vm::deleteInbox,
             onCreate = vm::createInbox,

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
@@ -81,6 +83,7 @@ fun HomeScreen(
     quotas: Map<Provider, CreationQuota.Status>,
     onOpenCreate: () -> Unit,
     onDismissError: () -> Unit,
+    onCancelCreate: () -> Unit,
     onOpen: (Inbox) -> Unit,
     onDelete: (Inbox) -> Unit,
     onCreate: (Provider, String?) -> Unit,
@@ -97,7 +100,8 @@ fun HomeScreen(
             }
         },
         snackbarHost = {
-            error?.let {
+            // While the create dialog is open its errors are shown inside it.
+            error?.takeIf { !showDialog }?.let {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
                     action = { TextButton(onClick = onDismissError) { Text("OK") } },
@@ -138,9 +142,10 @@ fun HomeScreen(
     if (showDialog) {
         CreateInboxDialog(
             creating = creating,
+            error = error,
             quotas = quotas,
-            onDismiss = { showDialog = false },
-            onCreate = { p, n -> showDialog = false; onCreate(p, n) },
+            onDismiss = { showDialog = false; onCancelCreate(); onDismissError() },
+            onCreate = onCreate,
         )
     }
 
@@ -204,6 +209,7 @@ private fun InboxCard(
 @Composable
 private fun CreateInboxDialog(
     creating: Boolean,
+    error: String?,
     quotas: Map<Provider, CreationQuota.Status>,
     onDismiss: () -> Unit,
     onCreate: (Provider, String?) -> Unit,
@@ -242,10 +248,11 @@ private fun CreateInboxDialog(
                     }
                 }
                 QuotaLine(status)
+                CreateStatusLine(creating, error)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    enabled = provider.allowsCustomName,
+                    enabled = provider.allowsCustomName && !creating,
                     singleLine = true,
                     label = { Text("Name (optional)") },
                     placeholder = { Text("empty = random") },
@@ -481,6 +488,30 @@ private fun ProviderRow(
             Icon(Icons.Outlined.Info, contentDescription = "About ${provider.label}")
         }
         RadioButton(selected = selected, onClick = null, enabled = !unavailable, modifier = dim.size(36.dp))
+    }
+}
+
+/** Always present (min height) so the dialog does not jump: creation in progress, or why it failed. */
+@Composable
+private fun CreateStatusLine(creating: Boolean, error: String?) {
+    Row(
+        Modifier.heightIn(min = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        when {
+            creating -> {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                Text("Creating the address…", style = MaterialTheme.typography.bodySmall)
+            }
+            error != null -> Text(
+                error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
