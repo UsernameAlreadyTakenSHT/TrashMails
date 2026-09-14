@@ -82,7 +82,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.rememberMessageHost
 @Composable
 fun HomeScreen(
     inboxes: List<Inbox>,
-    counts: Map<String, Int>,
+    unread: Map<String, Int>,
     creating: Boolean,
     error: String?,
     notice: String?,
@@ -138,7 +138,7 @@ fun HomeScreen(
                 items(inboxes, key = { it.key }) { inbox ->
                     InboxCard(
                         inbox = inbox,
-                        count = counts[inbox.key],
+                        unread = unread[inbox.key],
                         onClick = { onOpen(inbox) },
                         onCopy = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") },
                         onDelete = { toDelete = inbox.key },
@@ -186,7 +186,7 @@ private fun AddressLine(address: String) {
 @Composable
 private fun InboxCard(
     inbox: Inbox,
-    count: Int?,
+    unread: Int?,
     onClick: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
@@ -201,7 +201,7 @@ private fun InboxCard(
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ProviderLogo(inbox.provider, 28.dp)
-                    count?.takeIf { it > 0 }?.let { Badge { Text("$it") } }
+                    unread?.takeIf { it > 0 }?.let { Badge { Text("$it") } }
                     formatRemaining(inbox.expiresAt)?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

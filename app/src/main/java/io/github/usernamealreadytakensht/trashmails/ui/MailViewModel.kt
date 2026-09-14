@@ -13,6 +13,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
+import io.github.usernamealreadytakensht.trashmails.data.ReadStore
 import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
 import io.github.usernamealreadytakensht.trashmails.data.providers.BurnerKiwiProvider
@@ -44,6 +45,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val store = InboxStore(app)
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
+    private val readStore = ReadStore(app)
     private val providers: Map<Provider, MailProvider> = listOf(
         InboxKittenProvider(), MaildropProvider(), GuerrillaMailProvider(), MailTmProvider(), BurnerKiwiProvider(),
     ).associateBy { it.provider }
@@ -80,8 +82,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Creation quota per provider (rolling 24 h), refreshed by [refreshQuota]. */
     var quotas by mutableStateOf(Provider.entries.associateWith { quota.status(it) })
         private set
-    /** Known message count per inbox, for the badge on the home screen. */
-    var counts by mutableStateOf<Map<String, Int>>(emptyMap())
+    /** Unread messages per inbox at its last listing, for the badge on the home screen. */
+    var unread by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+    /** Ids of the messages opened at least once, per inbox key. */
+    var read by mutableStateOf(readStore.load())
         private set
 
     /** Set between onStart and onStop of the activity: polling only runs while true. */
@@ -159,7 +164,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val kept = inboxes.filter { it.createdAt >= cutoff || it.key == open }
         if (kept.size != inboxes.size) {
             inboxes = kept
-            counts = counts.filterKeys { key -> kept.any { it.key == key } }
+            unread = unread.filterKeys { key -> kept.any { it.key == key } }
+            read = read.filterKeys { key -> kept.any { it.key == key } }
+            readStore.save(read)
             store.save(kept)
         }
     }
@@ -221,7 +228,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun forget(inbox: Inbox) {
         inboxes = inboxes.filterNot { it.key == inbox.key }
-        counts = counts - inbox.key
+        unread = unread - inbox.key
+        read = read - inbox.key
+        readStore.save(read)
         store.save(inboxes)
     }
 
@@ -233,8 +242,17 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         startPolling(inbox)
     }
 
+    fun isRead(inbox: Inbox, summary: MailSummary) = read[inbox.key]?.contains(summary.id) == true
+
+    private fun countUnread(inbox: Inbox, list: List<MailSummary>) = list.count { !isRead(inbox, it) }
+
     fun openMessage(inbox: Inbox, summary: MailSummary) {
         screen = Screen.Message(inbox, summary)
+        if (!isRead(inbox, summary)) {
+            read = read + (inbox.key to read[inbox.key].orEmpty() + summary.id)
+            readStore.save(read)
+            unread = unread + (inbox.key to countUnread(inbox, messages))
+        }
         messageJob?.cancel()
         content = null
         error = null
@@ -258,7 +276,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val deleted = attempt("Could not delete the message") { providerFor(inbox).deleteMessage(inbox, summary) }
             if (deleted == true && currentInbox()?.key == inbox.key) {
                 messages = messages.filterNot { it.id == summary.id }
-                counts = counts + (inbox.key to messages.size)
+                unread = unread + (inbox.key to countUnread(inbox, messages))
             }
         }
     }
@@ -293,7 +311,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             lastFetchKey = inbox.key
             lastFetchAt = System.currentTimeMillis()
             messages = list
-            counts = counts + (inbox.key to list.size)
+            unread = unread + (inbox.key to countUnread(inbox, list))
             listLoaded = true
             error = null
         }

@@ -53,6 +53,7 @@ fun InboxScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpen: (MailSummary) -> Unit,
+    isRead: (MailSummary) -> Boolean,
     onDismissError: (String) -> Unit,
     onDismissNotice: (String) -> Unit,
 ) {
@@ -97,7 +98,7 @@ fun InboxScreen(
             } else {
                 LazyColumn {
                     items(messages, key = { it.id }) { m ->
-                        MessageRow(m, onClick = { onOpen(m) })
+                        MessageRow(m, read = isRead(m), onClick = { onOpen(m) })
                         HorizontalDivider()
                     }
                 }
@@ -106,8 +107,10 @@ fun InboxScreen(
     }
 }
 
+/** Unread messages stand out in bold. */
 @Composable
-private fun MessageRow(m: MailSummary, onClick: () -> Unit) {
+private fun MessageRow(m: MailSummary, read: Boolean, onClick: () -> Unit) {
+    val weight = if (read) FontWeight.Normal else FontWeight.Bold
     Column(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
@@ -116,7 +119,7 @@ private fun MessageRow(m: MailSummary, onClick: () -> Unit) {
                 m.from.ifBlank { "(unknown sender)" },
                 modifier = Modifier.weight(1f),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium, fontWeight = weight,
             )
             Spacer(Modifier.width(8.dp))
             Text(formatDate(m.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -125,7 +128,7 @@ private fun MessageRow(m: MailSummary, onClick: () -> Unit) {
         Text(
             m.subject.ifBlank { "(no subject)" },
             maxLines = 2, overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium, fontWeight = weight,
         )
     }
 }

@@ -81,7 +81,7 @@ private fun App(vm: MailViewModel) {
     when (val s = vm.screen) {
         Screen.Home -> HomeScreen(
             inboxes = vm.inboxes,
-            counts = vm.counts,
+            unread = vm.unread,
             creating = vm.creating,
             error = vm.error,
             notice = vm.notice,
@@ -113,6 +113,7 @@ private fun App(vm: MailViewModel) {
             onBack = vm::back,
             onRefresh = { vm.refresh(s.inbox) },
             onOpen = { vm.openMessage(s.inbox, it) },
+            isRead = { vm.isRead(s.inbox, it) },
             onDismissError = vm::clearError,
             onDismissNotice = vm::clearNotice,
         )
