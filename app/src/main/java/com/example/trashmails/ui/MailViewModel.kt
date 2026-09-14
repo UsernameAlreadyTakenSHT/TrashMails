@@ -72,6 +72,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     var counts by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
 
+    /** Set between onStart and onStop of the activity: polling only runs while true. */
+    private var foreground = false
     private var createJob: Job? = null
     private var pollJob: Job? = null
     private var messageJob: Job? = null
@@ -101,6 +103,18 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     } catch (e: Exception) {
         error = e.message?.takeIf { it.isNotBlank() } ?: fallback
         null
+    }
+
+    /** The app is visible again: resume polling the open inbox, waiting out the rest of the interval. */
+    fun onForeground() {
+        foreground = true
+        currentInbox()?.let { startPolling(it, immediate = false) }
+    }
+
+    /** Screen off or another app in front: no request until [onForeground]. */
+    fun onBackground() {
+        foreground = false
+        stopPolling()
     }
 
     fun refreshQuota() {
@@ -216,10 +230,18 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         listLoading = false
     }
 
-    /** Lists [inbox] now, then every [POLL_INTERVAL_MS] until [stopPolling]. */
-    private fun startPolling(inbox: Inbox) {
+    /**
+     * Lists [inbox] then again every [POLL_INTERVAL_MS] until [stopPolling]. With [immediate] false
+     * the first listing waits for the interval to elapse since the last one of the same inbox.
+     */
+    private fun startPolling(inbox: Inbox, immediate: Boolean = true) {
         stopPolling()
+        if (!foreground) return
         pollJob = viewModelScope.launch {
+            if (!immediate && lastFetchKey == inbox.key) {
+                val wait = lastFetchAt + POLL_INTERVAL_MS - System.currentTimeMillis()
+                if (wait > 0) delay(wait)
+            }
             while (isActive) {
                 fetch(inbox)
                 delay(POLL_INTERVAL_MS)

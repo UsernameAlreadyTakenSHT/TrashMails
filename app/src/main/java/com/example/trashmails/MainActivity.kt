@@ -24,6 +24,16 @@ class MainActivity : ComponentActivity() {
             TrashMailsTheme { App(vm) }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        vm.onForeground()
+    }
+
+    override fun onStop() {
+        vm.onBackground()
+        super.onStop()
+    }
 }
 
 @Composable
