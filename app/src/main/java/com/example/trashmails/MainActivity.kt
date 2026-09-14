@@ -86,6 +86,7 @@ private fun App(vm: MailViewModel) {
             error = vm.error,
             notice = vm.notice,
             quotas = vm.quotas,
+            defaultProvider = vm.settings.lastProvider,
             onOpenCreate = vm::refreshQuota,
             onOpenSettings = vm::openSettings,
             onDismissError = vm::clearError,

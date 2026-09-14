@@ -87,6 +87,7 @@ fun HomeScreen(
     error: String?,
     notice: String?,
     quotas: Map<Provider, CreationQuota.Status>,
+    defaultProvider: Provider,
     onOpenCreate: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismissError: (String) -> Unit,
@@ -152,6 +153,7 @@ fun HomeScreen(
             creating = creating,
             error = error,
             quotas = quotas,
+            defaultProvider = defaultProvider,
             onDismiss = { showDialog = false; onCancelCreate(); error?.let(onDismissError) },
             onCreate = onCreate,
         )
@@ -220,10 +222,11 @@ private fun CreateInboxDialog(
     creating: Boolean,
     error: String?,
     quotas: Map<Provider, CreationQuota.Status>,
+    defaultProvider: Provider,
     onDismiss: () -> Unit,
     onCreate: (Provider, String?) -> Unit,
 ) {
-    var provider by rememberSaveable { mutableStateOf(Provider.INBOX_KITTEN) }
+    var provider by rememberSaveable { mutableStateOf(defaultProvider.takeIf { it.available } ?: Provider.INBOX_KITTEN) }
     var name by rememberSaveable { mutableStateOf("") }
     var infoFor by rememberSaveable { mutableStateOf<Provider?>(null) }
     val status = quotas[provider]

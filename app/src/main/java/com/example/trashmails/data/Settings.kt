@@ -18,6 +18,10 @@ data class Settings(
     val forgetAfterHours: Int = 0,
     /** "system", "light" or "dark". */
     val theme: String = THEME_SYSTEM,
+    /** Provider preselected in the create dialog: the last one used. */
+    val lastProvider: Provider = Provider.INBOX_KITTEN,
+    /** Put a freshly created address on the clipboard. */
+    val copyOnCreate: Boolean = true,
 ) {
     val pollIntervalMs: Long get() = pollIntervalSec * 1000L
     val autoRefresh: Boolean get() = pollIntervalSec > 0
@@ -49,6 +53,9 @@ class SettingsStore(context: Context) {
             blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
             forgetAfterHours = prefs.getInt(FORGET_AFTER, defaults.forgetAfterHours),
             theme = prefs.getString(THEME, null) ?: defaults.theme,
+            lastProvider = prefs.getString(LAST_PROVIDER, null)?.let { name -> Provider.entries.firstOrNull { it.name == name } }
+                ?: defaults.lastProvider,
+            copyOnCreate = prefs.getBoolean(COPY_ON_CREATE, defaults.copyOnCreate),
         )
     }
 
@@ -61,6 +68,8 @@ class SettingsStore(context: Context) {
             .putBoolean(BLOCK_SCREENSHOTS, s.blockScreenshots)
             .putInt(FORGET_AFTER, s.forgetAfterHours)
             .putString(THEME, s.theme)
+            .putString(LAST_PROVIDER, s.lastProvider.name)
+            .putBoolean(COPY_ON_CREATE, s.copyOnCreate)
             .apply()
     }
 
@@ -72,5 +81,7 @@ class SettingsStore(context: Context) {
         const val BLOCK_SCREENSHOTS = "block_screenshots"
         const val FORGET_AFTER = "forget_after_hours"
         const val THEME = "theme"
+        const val LAST_PROVIDER = "last_provider"
+        const val COPY_ON_CREATE = "copy_on_create"
     }
 }
