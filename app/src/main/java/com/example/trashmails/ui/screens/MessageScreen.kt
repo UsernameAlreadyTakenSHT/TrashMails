@@ -23,7 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,11 +36,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,10 +51,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.trashmails.data.MailContent
 import com.example.trashmails.data.MailSummary
 import com.example.trashmails.data.Provider
+import com.example.trashmails.data.Settings
 import com.example.trashmails.ui.CopyIcon
 import com.example.trashmails.ui.copyToClipboard
 import com.example.trashmails.ui.formatDate
+import com.example.trashmails.ui.htmlToText
 
+/**
+ * One message. The body is plain text unless [Settings.renderHtml] is on; either way the
+ * overflow menu switches this message alone to the other rendering.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageScreen(
@@ -57,10 +69,15 @@ fun MessageScreen(
     content: MailContent?,
     loading: Boolean,
     error: String?,
+    settings: Settings,
     onBack: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
     val context = LocalContext.current
+    var showHtml by rememberSaveable(summary.id) { mutableStateOf(settings.renderHtml) }
+    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    val hasHtml = content?.html != null
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -76,6 +93,17 @@ fun MessageScreen(
                     if (onDelete != null) IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete")
                     }
+                    if (hasHtml) {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (showHtml) "View as plain text" else "View as HTML") },
+                                onClick = { showHtml = !showHtml; menuOpen = false },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -90,25 +118,33 @@ fun MessageScreen(
                 )
             }
             HorizontalDivider()
+            val text = content?.text ?: content?.html?.let(::htmlToText)
             when {
-                content?.html != null -> HtmlBody(content.html)
-                content?.text != null -> SelectionContainer {
-                    Text(
-                        content.text,
-                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                content == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     when {
                         loading -> CircularProgressIndicator()
                         error != null -> Text(error, color = MaterialTheme.colorScheme.error)
                         else -> Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                showHtml && content.html != null -> HtmlBody(content.html)
+                !text.isNullOrBlank() -> PlainBody(text)
+                else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PlainBody(text: String) {
+    SelectionContainer {
+        Text(
+            text,
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -175,12 +211,3 @@ private fun withViewport(html: String): String {
     return if (head != null) html.replaceRange(head.range.last + 1, head.range.last + 1, VIEWPORT)
     else VIEWPORT + html
 }
-
-/** Rough text extraction from an HTML email (for copying). */
-private fun htmlToText(html: String): String =
-    html.replace(Regex("""(?is)<(script|style)[^>]*>.*?</\1>"""), "")
-        .replace(Regex("""(?i)<br\s*/?>|</p>|</div>|</tr>|</li>|</h[1-6]>"""), "\n")
-        .replace(Regex("<[^>]+>"), "")
-        .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        .replace("&quot;", "\"").replace("&#39;", "'")
-        .lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n")
