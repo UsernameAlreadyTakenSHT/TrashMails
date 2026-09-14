@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -81,7 +83,16 @@ fun MessageScreen(
     var showHtml by rememberSaveable(summary.id) { mutableStateOf(settings.renderHtml) }
     var loadImages by rememberSaveable(summary.id) { mutableStateOf(settings.loadImages) }
     var menuOpen by rememberSaveable { mutableStateOf(false) }
+    /** A tapped link waiting for the user's go-ahead (as a string: Uri is not saveable). */
+    var pendingLink by rememberSaveable { mutableStateOf<String?>(null) }
     val hasHtml = content?.html != null
+    val onLink: (Uri) -> Unit = { uri ->
+        when {
+            !isAllowedLink(uri) -> Toast.makeText(context, "Links of this kind cannot be opened", Toast.LENGTH_SHORT).show()
+            settings.confirmLinks -> pendingLink = uri.toString()
+            else -> openLink(context, uri)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -138,7 +149,7 @@ fun MessageScreen(
                 }
                 showHtml && content.html != null -> {
                     if (!loadImages) BlockedBanner(onLoad = { loadImages = true })
-                    HtmlBody(content.html, loadImages)
+                    HtmlBody(content.html, loadImages, onLink)
                 }
                 !text.isNullOrBlank() -> PlainBody(text)
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -146,6 +157,15 @@ fun MessageScreen(
                 }
             }
         }
+    }
+
+    pendingLink?.let { link ->
+        LinkDialog(
+            url = link,
+            onOpen = { pendingLink = null; openLink(context, Uri.parse(link)) },
+            onCopy = { pendingLink = null; context.copyToClipboard(link, "Link copied") },
+            onDismiss = { pendingLink = null },
+        )
     }
 }
 
@@ -186,7 +206,7 @@ private fun BlockedBanner(onLoad: () -> Unit) {
 @Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun HtmlBody(html: String, loadImages: Boolean) {
+private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
     val dark = isSystemInDarkTheme()
     val background = MaterialTheme.colorScheme.surface.toArgb()
     // Reload only when the content or the image policy changes, not on every recomposition.
@@ -202,7 +222,7 @@ private fun HtmlBody(html: String, loadImages: Boolean) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) settings.isAlgorithmicDarkeningAllowed = true
                     else settings.forceDark = WebSettings.FORCE_DARK_ON
                 }
-                webViewClient = MailWebViewClient(onLink = { openLink(ctx, it) })
+                webViewClient = MailWebViewClient(onLink)
                 settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
@@ -240,17 +260,41 @@ private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClie
 }
 
 /**
- * Opens a link from an email in the browser (or the mail app for mailto:). Any other scheme is
- * dropped: the sender must not be able to fire intent://, tel: or another app's deep link.
+ * Shows where a link leads before leaving the app: the site (or address) in large type, since that
+ * is what to check, and the full URL under it.
  */
+@Composable
+private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
+    val uri = Uri.parse(url)
+    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host ?: url
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (uri.scheme.equals("mailto", ignoreCase = true)) "Write to this address?" else "Open this site?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SelectionContainer {
+                    Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onOpen) { Text("Open") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onCopy) { Text("Copy link") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+/** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
+private fun isAllowedLink(uri: Uri): Boolean = uri.scheme?.lowercase() in setOf("http", "https", "mailto")
+
+/** Opens an allowed link in the browser (or the mail app for mailto:). */
 private fun openLink(context: Context, uri: Uri) {
-    val web = when (uri.scheme?.lowercase()) {
-        "http", "https" -> true
-        "mailto" -> false
-        else -> return
-    }
     val intent = Intent(Intent.ACTION_VIEW, uri)
-    if (web) intent.addCategory(Intent.CATEGORY_BROWSABLE)
+    if (!uri.scheme.equals("mailto", ignoreCase = true)) intent.addCategory(Intent.CATEGORY_BROWSABLE)
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
