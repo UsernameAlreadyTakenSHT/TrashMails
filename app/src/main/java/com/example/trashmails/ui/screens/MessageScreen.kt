@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,6 +15,7 @@ import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,6 +59,7 @@ import com.example.trashmails.ui.CopyIcon
 import com.example.trashmails.ui.copyToClipboard
 import com.example.trashmails.ui.formatDate
 import com.example.trashmails.ui.htmlToText
+import java.io.ByteArrayInputStream
 
 /**
  * One message. The body is plain text unless [Settings.renderHtml] is on; either way the
@@ -75,6 +79,7 @@ fun MessageScreen(
 ) {
     val context = LocalContext.current
     var showHtml by rememberSaveable(summary.id) { mutableStateOf(settings.renderHtml) }
+    var loadImages by rememberSaveable(summary.id) { mutableStateOf(settings.loadImages) }
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     val hasHtml = content?.html != null
 
@@ -93,16 +98,20 @@ fun MessageScreen(
                     if (onDelete != null) IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete")
                     }
-                    if (hasHtml) {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text(if (showHtml) "View as plain text" else "View as HTML") },
-                                onClick = { showHtml = !showHtml; menuOpen = false },
-                            )
-                        }
+                    // Always present so the buttons keep their place while the body loads.
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (showHtml) "View as plain text" else "View as HTML") },
+                            enabled = hasHtml,
+                            onClick = { showHtml = !showHtml; menuOpen = false },
+                        )
+                        if (hasHtml && showHtml && !loadImages) DropdownMenuItem(
+                            text = { Text("Load remote images") },
+                            onClick = { loadImages = true; menuOpen = false },
+                        )
                     }
                 },
             )
@@ -127,7 +136,10 @@ fun MessageScreen(
                         else -> Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                showHtml && content.html != null -> HtmlBody(content.html)
+                showHtml && content.html != null -> {
+                    if (!loadImages) BlockedBanner(onLoad = { loadImages = true })
+                    HtmlBody(content.html, loadImages)
+                }
                 !text.isNullOrBlank() -> PlainBody(text)
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -148,12 +160,37 @@ private fun PlainBody(text: String) {
     }
 }
 
+/** Tells that the sender's images, styles and fonts were not fetched, with a way to fetch them. */
+@Composable
+private fun BlockedBanner(onLoad: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Remote images not loaded",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onLoad) { Text("Load") }
+    }
+    HorizontalDivider()
+}
+
+/**
+ * The HTML body in a WebView. Unless [loadImages], every network load is blocked (images, styles,
+ * fonts, frames): the sender learns nothing from the message being opened. Inline data: images
+ * still show.
+ */
 @Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun HtmlBody(html: String) {
+private fun HtmlBody(html: String, loadImages: Boolean) {
     val dark = isSystemInDarkTheme()
     val background = MaterialTheme.colorScheme.surface.toArgb()
+    // Reload only when the content or the image policy changes, not on every recomposition.
+    val key = html.hashCode() to loadImages
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
@@ -165,13 +202,7 @@ private fun HtmlBody(html: String) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) settings.isAlgorithmicDarkeningAllowed = true
                     else settings.forceDark = WebSettings.FORCE_DARK_ON
                 }
-                // A tapped link leaves the app: nothing ever navigates inside the mail view.
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                        openLink(ctx, request.url)
-                        return true
-                    }
-                }
+                webViewClient = MailWebViewClient(onLink = { openLink(ctx, it) })
                 settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
@@ -179,8 +210,33 @@ private fun HtmlBody(html: String) {
                 settings.displayZoomControls = false
             }
         },
-        update = { it.loadDataWithBaseURL(null, withViewport(html), "text/html", "utf-8", null) },
+        update = { view ->
+            if (view.tag != key) {
+                view.tag = key
+                view.settings.blockNetworkLoads = !loadImages
+                (view.webViewClient as MailWebViewClient).blockRemote = !loadImages
+                view.loadDataWithBaseURL(null, withViewport(html), "text/html", "utf-8", null)
+            }
+        },
     )
+}
+
+/**
+ * A tapped link leaves the app ([onLink]); nothing ever navigates inside the mail view. While
+ * [blockRemote], every resource request gets an empty reply — a second guard behind
+ * WebSettings.blockNetworkLoads. Requests are intercepted off the main thread, hence the flag
+ * kept here rather than read from the WebView.
+ */
+private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClient() {
+    @Volatile var blockRemote = true
+
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        onLink(request.url)
+        return true
+    }
+
+    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+        if (blockRemote) WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))) else null
 }
 
 /**
