@@ -28,8 +28,8 @@ service comes back.
 ## Features
 
 - Several inboxes side by side, persisted locally
-- Auto-refresh every minute while an inbox is open, manual refresh (max once per 30 s)
-- HTML emails rendered in a WebView (JavaScript disabled), plain-text fallback
+- Auto-refresh every minute while an inbox is open (paused when the app is in the background), manual refresh (max once per 30 s)
+- HTML emails rendered in a WebView (JavaScript disabled, links open in the browser), plain-text fallback, dark mode
 - Copy the address or the message text to the clipboard
 - Retention rules, website, privacy policy and source repository of each provider behind an (i) button (retention shown again when removing an address)
 - Courtesy creation quota per rolling 24 h: 20 per provider (10 for mail.tm, 5 for Burner Kiwi)
