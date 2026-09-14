@@ -28,7 +28,8 @@ class CreationQuota(context: Context) {
         prefs.getString(provider.name, null)
             ?.split(',')
             ?.mapNotNull { it.toLongOrNull() }
-            ?.filter { now - it < WINDOW_MS }
+            // A stamp in the future (clock set back) would block creation for up to a day: dropped.
+            ?.filter { it <= now && now - it < WINDOW_MS }
             .orEmpty()
 
     private fun save(provider: Provider, stamps: List<Long>) {

@@ -10,10 +10,9 @@ class InboxStore(context: Context) {
 
     fun load(): List<Inbox> {
         val raw = prefs.getString(KEY, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).mapNotNull { i -> fromJson(arr.getJSONObject(i)) }
-        }.getOrDefault(emptyList())
+        val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        // One malformed entry is dropped on its own, not the whole list with it.
+        return (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
     }
 
     fun save(inboxes: List<Inbox>) {
