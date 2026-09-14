@@ -9,6 +9,9 @@ performance, UX, code quality).
 - **Emails are shown as plain text** unless HTML rendering is on: nothing the sender wrote is rendered or fetched. The HTML is converted to text with links spelled out after their anchor text. A single message can be viewed as HTML, and back, from its menu.
 - **Remote images are blocked** when an email is rendered as HTML — images, styles, fonts and frames alike, so the sender cannot tell the email was opened. A banner and a menu entry load them for that message only.
 - **Links are confirmed before they open**: a dialog shows the site (or the address, for mailto:) in large type and the full URL, with Open, Copy link and Cancel.
+- **Removing a mail.tm address can delete the account on the server**, messages included (ticked by default in the remove dialog). Before, only the password was forgotten and the messages stayed seven days.
+- **More settings**: auto-refresh interval (30 s, 1 min, 5 min or manual only), forget old addresses (24 h, 7 or 30 days — local list only), block screenshots (FLAG_SECURE), theme (system, light, dark), copy a new address to the clipboard on creation.
+- **The create dialog preselects the last provider used.**
 - **Delete button on every provider that supports it** — Guerrilla Mail and mail.tm, not only Maildrop. The message disappears from the list at once, without a refetch.
 - **Feedback while an address is created.** The dialog stays open with a progress line, Create disabled, and closes by itself when the new inbox opens; a failure shows on that same line, and Cancel abandons the creation.
 - **Dark mode**: dark window from the first frame, and HTML emails darkened in the message view.

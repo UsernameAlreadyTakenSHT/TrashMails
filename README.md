@@ -28,10 +28,10 @@ service comes back.
 ## Features
 
 - Several inboxes side by side, persisted locally
-- Auto-refresh every minute while an inbox is open (paused when the app is in the background), manual refresh (max once per 30 s)
+- Auto-refresh while an inbox is open (every 30 s to 5 min, or manual; paused in the background), manual refresh (max once per 30 s)
 - Emails shown as plain text by default; HTML rendering (JavaScript disabled, remote images blocked unless asked) globally or per message, dark mode
 - Links are confirmed before leaving the app (site and full address shown), and only http(s) and mailto links can be opened
-- Settings: render HTML, load remote images, confirm links — all default to the safe side
+- Settings: render HTML, load remote images, confirm links, auto-refresh interval (30 s to manual), forget old addresses, block screenshots, theme, copy new addresses — privacy ones default to the safe side
 - Copy the address or the message text to the clipboard
 - Retention rules, website, privacy policy and source repository of each provider behind an (i) button (retention shown again when removing an address)
 - Courtesy creation quota per rolling 24 h: 20 per provider (10 for mail.tm, 5 for Burner Kiwi)
