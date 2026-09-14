@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -38,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -84,6 +86,7 @@ fun HomeScreen(
     notice: String?,
     quotas: Map<Provider, CreationQuota.Status>,
     onOpenCreate: () -> Unit,
+    onOpenSettings: () -> Unit,
     onDismissError: (String) -> Unit,
     onDismissNotice: (String) -> Unit,
     onCancelCreate: () -> Unit,
@@ -100,8 +103,13 @@ fun HomeScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text("TrashMails") }) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onOpenCreate(); showDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "New address")
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SmallFloatingActionButton(onClick = onOpenSettings) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                }
+                FloatingActionButton(onClick = { onOpenCreate(); showDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "New address")
+                }
             }
         },
         snackbarHost = { SnackbarHost(host) },

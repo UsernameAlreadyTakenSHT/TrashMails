@@ -12,6 +12,7 @@ import com.example.trashmails.ui.Screen
 import com.example.trashmails.ui.screens.HomeScreen
 import com.example.trashmails.ui.screens.InboxScreen
 import com.example.trashmails.ui.screens.MessageScreen
+import com.example.trashmails.ui.screens.SettingsScreen
 import com.example.trashmails.ui.theme.TrashMailsTheme
 
 class MainActivity : ComponentActivity() {
@@ -49,12 +50,18 @@ private fun App(vm: MailViewModel) {
             notice = vm.notice,
             quotas = vm.quotas,
             onOpenCreate = vm::refreshQuota,
+            onOpenSettings = vm::openSettings,
             onDismissError = vm::clearError,
             onDismissNotice = vm::clearNotice,
             onCancelCreate = vm::cancelCreate,
             onOpen = vm::openInbox,
             onDelete = vm::deleteInbox,
             onCreate = vm::createInbox,
+        )
+        Screen.Settings -> SettingsScreen(
+            settings = vm.settings,
+            onChange = vm::updateSettings,
+            onBack = vm::back,
         )
         is Screen.InboxDetail -> InboxScreen(
             inbox = s.inbox,

@@ -13,6 +13,8 @@ import com.example.trashmails.data.MailContent
 import com.example.trashmails.data.MailProvider
 import com.example.trashmails.data.MailSummary
 import com.example.trashmails.data.Provider
+import com.example.trashmails.data.Settings
+import com.example.trashmails.data.SettingsStore
 import com.example.trashmails.data.providers.BurnerKiwiProvider
 import com.example.trashmails.data.providers.GuerrillaMailProvider
 import com.example.trashmails.data.providers.InboxKittenProvider
@@ -28,6 +30,7 @@ import kotlinx.coroutines.withContext
 
 sealed interface Screen {
     data object Home : Screen
+    data object Settings : Screen
     data class InboxDetail(val inbox: Inbox) : Screen
     data class Message(val inbox: Inbox, val summary: MailSummary) : Screen
 }
@@ -40,11 +43,14 @@ sealed interface Screen {
 class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val store = InboxStore(app)
     private val quota = CreationQuota(app)
+    private val settingsStore = SettingsStore(app)
     private val providers: Map<Provider, MailProvider> = listOf(
         InboxKittenProvider(), MaildropProvider(), GuerrillaMailProvider(), MailTmProvider(), BurnerKiwiProvider(),
     ).associateBy { it.provider }
 
     var inboxes by mutableStateOf(store.load())
+        private set
+    var settings by mutableStateOf(settingsStore.load())
         private set
     var screen: Screen by mutableStateOf(Screen.Home)
         private set
@@ -95,7 +101,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private fun currentInbox(): Inbox? = when (val s = screen) {
         is Screen.InboxDetail -> s.inbox
         is Screen.Message -> s.inbox
-        Screen.Home -> null
+        Screen.Home, Screen.Settings -> null
     }
 
     /**
@@ -122,6 +128,15 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun onBackground() {
         foreground = false
         stopPolling()
+    }
+
+    fun openSettings() {
+        screen = Screen.Settings
+    }
+
+    fun updateSettings(s: Settings) {
+        settings = s
+        settingsStore.save(s)
     }
 
     fun refreshQuota() {
@@ -209,6 +224,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         when (val s = screen) {
             is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox) }
             is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList() }
+            Screen.Settings -> screen = Screen.Home
             Screen.Home -> Unit
         }
     }
