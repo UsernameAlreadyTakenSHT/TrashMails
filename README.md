@@ -39,7 +39,7 @@ one mail.tm requires (a random password kept on the device, excluded from Androi
 
 ## Build
 
-Requires Android Studio (or a JDK 17+ and the Android SDK, API 37).
+Requires Android Studio (or a JDK and the Android SDK, API 37; Gradle provisions the JDK 25 toolchain it builds with).
 
 ```
 ./gradlew assembleDebug
