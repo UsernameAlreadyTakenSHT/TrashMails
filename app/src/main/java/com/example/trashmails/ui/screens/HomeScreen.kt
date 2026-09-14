@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -91,7 +93,8 @@ fun HomeScreen(
     onDismissNotice: (String) -> Unit,
     onCancelCreate: () -> Unit,
     onOpen: (Inbox) -> Unit,
-    onDelete: (Inbox) -> Unit,
+    onDelete: (Inbox, Boolean) -> Unit,
+    canDeleteOnServer: (Inbox) -> Boolean,
     onCreate: (Provider, String?) -> Unit,
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
@@ -158,7 +161,8 @@ fun HomeScreen(
         val inbox = inboxes.firstOrNull { it.key == key }
         if (inbox == null) toDelete = null else RemoveInboxDialog(
             inbox = inbox,
-            onConfirm = { onDelete(inbox); toDelete = null },
+            canDeleteOnServer = canDeleteOnServer(inbox),
+            onConfirm = { onServer -> onDelete(inbox, onServer); toDelete = null },
             onDismiss = { toDelete = null },
         )
     }
@@ -371,7 +375,7 @@ private fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         ),
         account = listOf(
             "A real account (address + password) that mail.tm keeps until it is deleted.",
-            "Removing the address only forgets it in this app; the password is lost with it, so nobody can open the inbox anymore.",
+            "Removing the address can delete the account on mail.tm, messages included (ticked by default); otherwise the password is just lost and nobody can open the inbox anymore.",
         ),
         warning = null,
     )
@@ -400,8 +404,15 @@ private fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
     )
 }
 
+/** [onConfirm] receives whether the inbox should also be deleted on the server (when the provider can). */
 @Composable
-private fun RemoveInboxDialog(inbox: Inbox, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun RemoveInboxDialog(
+    inbox: Inbox,
+    canDeleteOnServer: Boolean,
+    onConfirm: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var onServer by rememberSaveable { mutableStateOf(canDeleteOnServer) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Remove this address?") },
@@ -416,9 +427,23 @@ private fun RemoveInboxDialog(inbox: Inbox, onConfirm: () -> Unit, onDismiss: ()
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 RetentionDetails(inbox.provider)
+                if (canDeleteOnServer) Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(value = onServer, role = Role.Checkbox, onValueChange = { onServer = it })
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = onServer, onCheckedChange = null)
+                    Text(
+                        "Also delete the account on ${inbox.provider.label}, messages included",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove") } },
+        confirmButton = { TextButton(onClick = { onConfirm(onServer) }) { Text(if (onServer) "Delete" else "Remove") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

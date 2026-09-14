@@ -64,6 +64,10 @@ interface MailProvider {
     /** Whether [deleteMessage] does anything on the server; the delete button is only shown when true. */
     val canDeleteMessages: Boolean get() = false
     suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean = false
+
+    /** Whether [deleteInbox] removes the inbox on the server (an account), not only from this app. */
+    val canDeleteInbox: Boolean get() = false
+    suspend fun deleteInbox(inbox: Inbox): Boolean = false
 }
 
 open class ProviderException(message: String, cause: Throwable? = null) : Exception(message, cause)

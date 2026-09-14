@@ -56,6 +56,7 @@ private fun App(vm: MailViewModel) {
             onCancelCreate = vm::cancelCreate,
             onOpen = vm::openInbox,
             onDelete = vm::deleteInbox,
+            canDeleteOnServer = vm::canDeleteInbox,
             onCreate = vm::createInbox,
         )
         Screen.Settings -> SettingsScreen(

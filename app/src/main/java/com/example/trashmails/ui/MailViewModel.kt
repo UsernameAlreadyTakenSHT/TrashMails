@@ -174,7 +174,25 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         creating = false
     }
 
-    fun deleteInbox(inbox: Inbox) {
+    fun canDeleteInbox(inbox: Inbox) = providerFor(inbox).canDeleteInbox
+
+    /**
+     * Forgets [inbox]. With [onServer], the provider deletes it there first (a mail.tm account,
+     * messages included) and the address is only forgotten once that succeeded, so a failure
+     * leaves it in the list to try again.
+     */
+    fun deleteInbox(inbox: Inbox, onServer: Boolean = false) {
+        if (!onServer) { forget(inbox); return }
+        viewModelScope.launch {
+            val deleted = attempt("Could not delete the account on ${inbox.provider.label}") { providerFor(inbox).deleteInbox(inbox) }
+            if (deleted == true) {
+                forget(inbox)
+                notice = "Account deleted on ${inbox.provider.label}"
+            }
+        }
+    }
+
+    private fun forget(inbox: Inbox) {
         inboxes = inboxes.filterNot { it.key == inbox.key }
         counts = counts - inbox.key
         store.save(inboxes)

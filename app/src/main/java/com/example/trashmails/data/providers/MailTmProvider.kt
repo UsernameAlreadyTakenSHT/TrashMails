@@ -124,6 +124,15 @@ class MailTmProvider : MailProvider {
         return true
     }
 
+    override val canDeleteInbox get() = true
+
+    /** Deletes the account itself: every message goes with it and the address is freed. */
+    override suspend fun deleteInbox(inbox: Inbox): Boolean {
+        authed(inbox) { h -> Http.delete("$BASE/accounts/${inbox.id}", h) }
+        jwts.remove(inbox.id)
+        return true
+    }
+
     /**
      * The reason of a 422, from the API Platform error body: the violation messages when there
      * are some ("address: This value is already used."), else the description / detail line.
