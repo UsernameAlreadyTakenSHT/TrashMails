@@ -87,6 +87,15 @@ fun SettingsScreen(
                 selected = settings.pollIntervalSec,
                 onSelect = { onChange(settings.copy(pollIntervalSec = it)) },
             )
+            HorizontalDivider()
+            ChoiceRow(
+                title = "Forget old addresses",
+                description = "Addresses older than this are dropped from the list when the app opens. Nothing is " +
+                    "deleted on the provider's side; most inboxes have expired there long before.",
+                choices = Settings.FORGET_AFTER,
+                selected = settings.forgetAfterHours,
+                onSelect = { onChange(settings.copy(forgetAfterHours = it)) },
+            )
 
             SectionTitle("Privacy")
             SettingRow(

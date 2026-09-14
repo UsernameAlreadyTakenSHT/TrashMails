@@ -129,6 +129,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** The app is visible again: resume polling the open inbox, waiting out the rest of the interval. */
     fun onForeground() {
         foreground = true
+        forgetOldInboxes()
         currentInbox()?.let { startPolling(it, immediate = false) }
     }
 
@@ -147,6 +148,20 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         settings = s
         settingsStore.save(s)
         if (intervalChanged) currentInbox()?.let { startPolling(it, immediate = false) }
+        forgetOldInboxes()
+    }
+
+    /** Drops the addresses older than the setting allows (local list only; the open one is kept). */
+    private fun forgetOldInboxes() {
+        val maxAge = settings.forgetAfterMs ?: return
+        val cutoff = System.currentTimeMillis() - maxAge
+        val open = currentInbox()?.key
+        val kept = inboxes.filter { it.createdAt >= cutoff || it.key == open }
+        if (kept.size != inboxes.size) {
+            inboxes = kept
+            counts = counts.filterKeys { key -> kept.any { it.key == key } }
+            store.save(kept)
+        }
     }
 
     fun refreshQuota() {

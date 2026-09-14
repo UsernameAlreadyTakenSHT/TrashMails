@@ -14,13 +14,18 @@ data class Settings(
     val pollIntervalSec: Int = 60,
     /** FLAG_SECURE: no screenshots, no preview in the recent apps (verification codes stay in the app). */
     val blockScreenshots: Boolean = false,
+    /** Addresses created more than this many hours ago are forgotten (locally only); 0 keeps them. */
+    val forgetAfterHours: Int = 0,
 ) {
     val pollIntervalMs: Long get() = pollIntervalSec * 1000L
     val autoRefresh: Boolean get() = pollIntervalSec > 0
+    val forgetAfterMs: Long? get() = forgetAfterHours.takeIf { it > 0 }?.let { it * 3_600_000L }
 
     companion object {
         /** Choices offered for [pollIntervalSec], with their labels. */
         val POLL_INTERVALS = listOf(30 to "Every 30 s", 60 to "Every minute", 300 to "Every 5 min", 0 to "Manual only")
+        /** Choices offered for [forgetAfterHours], with their labels. */
+        val FORGET_AFTER = listOf(0 to "Never", 24 to "After 24 hours", 7 * 24 to "After 7 days", 30 * 24 to "After 30 days")
     }
 }
 
@@ -36,6 +41,7 @@ class SettingsStore(context: Context) {
             confirmLinks = prefs.getBoolean(CONFIRM_LINKS, defaults.confirmLinks),
             pollIntervalSec = prefs.getInt(POLL_INTERVAL, defaults.pollIntervalSec),
             blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
+            forgetAfterHours = prefs.getInt(FORGET_AFTER, defaults.forgetAfterHours),
         )
     }
 
@@ -46,6 +52,7 @@ class SettingsStore(context: Context) {
             .putBoolean(CONFIRM_LINKS, s.confirmLinks)
             .putInt(POLL_INTERVAL, s.pollIntervalSec)
             .putBoolean(BLOCK_SCREENSHOTS, s.blockScreenshots)
+            .putInt(FORGET_AFTER, s.forgetAfterHours)
             .apply()
     }
 
@@ -55,5 +62,6 @@ class SettingsStore(context: Context) {
         const val CONFIRM_LINKS = "confirm_links"
         const val POLL_INTERVAL = "poll_interval_sec"
         const val BLOCK_SCREENSHOTS = "block_screenshots"
+        const val FORGET_AFTER = "forget_after_hours"
     }
 }
