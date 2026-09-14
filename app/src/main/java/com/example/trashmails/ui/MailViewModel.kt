@@ -18,6 +18,7 @@ import com.example.trashmails.data.providers.GuerrillaMailProvider
 import com.example.trashmails.data.providers.InboxKittenProvider
 import com.example.trashmails.data.providers.MailTmProvider
 import com.example.trashmails.data.providers.MaildropProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -29,6 +30,11 @@ sealed interface Screen {
     data class Message(val inbox: Inbox, val summary: MailSummary) : Screen
 }
 
+/**
+ * Every network call runs in a job tied to the screen that needs it (creation, the inbox
+ * polling loop, one message body); leaving that screen cancels the job, so a slow reply can
+ * never land on a different screen. Cancellation is never reported as an error.
+ */
 class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val store = InboxStore(app)
     private val quota = CreationQuota(app)
@@ -45,7 +51,17 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var content by mutableStateOf<MailContent?>(null)
         private set
-    var loading by mutableStateOf(false)
+    /** An inbox is being created (the create dialog stays open meanwhile). */
+    var creating by mutableStateOf(false)
+        private set
+    /** The open inbox is being listed. */
+    var listLoading by mutableStateOf(false)
+        private set
+    /** The open inbox has been listed at least once: tells "empty" apart from "not loaded yet". */
+    var listLoaded by mutableStateOf(false)
+        private set
+    /** The open message body is being fetched. */
+    var messageLoading by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
         private set
@@ -56,12 +72,36 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     var counts by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
 
+    private var createJob: Job? = null
     private var pollJob: Job? = null
+    private var messageJob: Job? = null
+    /** Last successful listing, for the manual-refresh throttle. */
+    private var lastFetchKey: String? = null
     private var lastFetchAt = 0L
 
     private fun providerFor(inbox: Inbox) = providers.getValue(inbox.provider)
 
     fun canDeleteMessages(inbox: Inbox) = providerFor(inbox).canDeleteMessages
+
+    /** The inbox the current screen belongs to, if any. */
+    private fun currentInbox(): Inbox? = when (val s = screen) {
+        is Screen.InboxDetail -> s.inbox
+        is Screen.Message -> s.inbox
+        Screen.Home -> null
+    }
+
+    /**
+     * Runs [block] and returns its result, or null after storing a user-facing [error].
+     * Cancellation propagates untouched so a job cancelled by navigation leaves no trace.
+     */
+    private inline fun <T> attempt(fallback: String, block: () -> T): T? = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        error = e.message?.takeIf { it.isNotBlank() } ?: fallback
+        null
+    }
 
     fun refreshQuota() {
         quotas = Provider.entries.associateWith { quota.status(it) }
@@ -74,22 +114,28 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             error = "${provider.label}: limit of ${status.limit} per 24 h reached"
             return
         }
-        viewModelScope.launch {
-            loading = true
-            error = null
-            runCatching { providers.getValue(provider).createInbox(name) }
-                .onSuccess { inbox ->
-                    if (inboxes.none { it.key == inbox.key }) {
-                        inboxes = listOf(inbox) + inboxes
-                        store.save(inboxes)
-                        quota.record(provider)
-                        refreshQuota()
-                    }
-                    openInbox(inbox)
-                }
-                .onFailure { error = it.message ?: "Could not create the inbox" }
-            loading = false
+        createJob?.cancel()
+        creating = true
+        error = null
+        createJob = viewModelScope.launch {
+            val inbox = attempt("Could not create the inbox") { providers.getValue(provider).createInbox(name) }
+            creating = false
+            inbox ?: return@launch
+            if (inboxes.none { it.key == inbox.key }) {
+                inboxes = listOf(inbox) + inboxes
+                store.save(inboxes)
+                quota.record(provider)
+                refreshQuota()
+            }
+            openInbox(inbox)
         }
+    }
+
+    /** Abandons a creation in progress (the dialog was dismissed). */
+    fun cancelCreate() {
+        createJob?.cancel()
+        createJob = null
+        creating = false
     }
 
     fun deleteInbox(inbox: Inbox) {
@@ -101,62 +147,76 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun openInbox(inbox: Inbox) {
         screen = Screen.InboxDetail(inbox)
         messages = emptyList()
+        listLoaded = false
         error = null
         startPolling(inbox)
     }
 
     fun openMessage(inbox: Inbox, summary: MailSummary) {
         screen = Screen.Message(inbox, summary)
+        messageJob?.cancel()
         content = null
         error = null
-        viewModelScope.launch {
-            loading = true
-            runCatching { providerFor(inbox).getMessage(inbox, summary) }
-                .onSuccess { content = it }
-                .onFailure { error = it.message ?: "Could not load the message" }
-            loading = false
+        messageLoading = true
+        messageJob = viewModelScope.launch {
+            content = attempt("Could not load the message") { providerFor(inbox).getMessage(inbox, summary) }
+            messageLoading = false
         }
     }
 
+    private fun cancelMessage() {
+        messageJob?.cancel()
+        messageJob = null
+        messageLoading = false
+        content = null
+    }
+
     fun deleteMessage(inbox: Inbox, summary: MailSummary) {
+        // Not tied to a screen: a deletion started should complete even if the user moves on.
         viewModelScope.launch {
-            runCatching { providerFor(inbox).deleteMessage(inbox, summary) }
-                .onSuccess { if (it) fetch(inbox) }
-                .onFailure { error = it.message }
+            val deleted = attempt("Could not delete the message") { providerFor(inbox).deleteMessage(inbox, summary) }
+            if (deleted == true && currentInbox()?.key == inbox.key) {
+                messages = messages.filterNot { it.id == summary.id }
+                counts = counts + (inbox.key to messages.size)
+            }
         }
     }
 
     fun back() {
         when (val s = screen) {
-            is Screen.Message -> { screen = Screen.InboxDetail(s.inbox); content = null; error = null }
-            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; error = null }
+            is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox); error = null }
+            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList(); error = null }
             Screen.Home -> Unit
         }
     }
 
-    /** Manual refresh, throttled to once per [MANUAL_REFRESH_MIN_MS]. */
+    /** Manual refresh, throttled to once per [MANUAL_REFRESH_MIN_MS]; restarts the polling loop. */
     fun refresh(inbox: Inbox) {
-        val wait = MANUAL_REFRESH_MIN_MS - (System.currentTimeMillis() - lastFetchAt)
-        if (wait > 0) {
-            error = "Refresh available in ${(wait / 1000) + 1} s"
-            return
+        if (lastFetchKey == inbox.key) {
+            val wait = MANUAL_REFRESH_MIN_MS - (System.currentTimeMillis() - lastFetchAt)
+            if (wait > 0) {
+                error = "Refresh available in ${(wait / 1000) + 1} s"
+                return
+            }
         }
-        viewModelScope.launch { fetch(inbox) }
+        startPolling(inbox)
     }
 
     private suspend fun fetch(inbox: Inbox) {
-        lastFetchAt = System.currentTimeMillis()
-        loading = true
-        runCatching { providerFor(inbox).listMessages(inbox) }
-            .onSuccess {
-                messages = it
-                counts = counts + (inbox.key to it.size)
-                error = null
-            }
-            .onFailure { error = it.message ?: "Network error" }
-        loading = false
+        listLoading = true
+        val list = attempt("Could not load the inbox") { providerFor(inbox).listMessages(inbox) }
+        if (list != null) {
+            lastFetchKey = inbox.key
+            lastFetchAt = System.currentTimeMillis()
+            messages = list
+            counts = counts + (inbox.key to list.size)
+            listLoaded = true
+            error = null
+        }
+        listLoading = false
     }
 
+    /** Lists [inbox] now, then every [POLL_INTERVAL_MS] until [stopPolling]. */
     private fun startPolling(inbox: Inbox) {
         stopPolling()
         pollJob = viewModelScope.launch {
@@ -170,6 +230,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private fun stopPolling() {
         pollJob?.cancel()
         pollJob = null
+        listLoading = false
     }
 
     fun clearError() { error = null }

@@ -46,6 +46,7 @@ fun InboxScreen(
     inbox: Inbox,
     messages: List<MailSummary>,
     loading: Boolean,
+    loaded: Boolean,
     error: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
@@ -87,7 +88,11 @@ fun InboxScreen(
             if (messages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (loading) "Loading…" else "Inbox is empty.\nAuto-refresh every minute.",
+                        when {
+                            loaded -> "Inbox is empty.\nAuto-refresh every minute."
+                            error != null -> "Could not load the inbox.\nAuto-refresh every minute."
+                            else -> "Loading…"
+                        },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

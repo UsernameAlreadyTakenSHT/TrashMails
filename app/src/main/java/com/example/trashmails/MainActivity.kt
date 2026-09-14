@@ -34,7 +34,7 @@ private fun App(vm: MailViewModel) {
         Screen.Home -> HomeScreen(
             inboxes = vm.inboxes,
             counts = vm.counts,
-            creating = vm.loading,
+            creating = vm.creating,
             error = vm.error,
             quotas = vm.quotas,
             onOpenCreate = vm::refreshQuota,
@@ -46,7 +46,8 @@ private fun App(vm: MailViewModel) {
         is Screen.InboxDetail -> InboxScreen(
             inbox = s.inbox,
             messages = vm.messages,
-            loading = vm.loading,
+            loading = vm.listLoading,
+            loaded = vm.listLoaded,
             error = vm.error,
             onBack = vm::back,
             onRefresh = { vm.refresh(s.inbox) },
@@ -57,7 +58,7 @@ private fun App(vm: MailViewModel) {
             provider = s.inbox.provider,
             summary = s.summary,
             content = vm.content,
-            loading = vm.loading,
+            loading = vm.messageLoading,
             error = vm.error,
             onBack = vm::back,
             onDelete = if (vm.canDeleteMessages(s.inbox)) {
