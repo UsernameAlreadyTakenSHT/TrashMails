@@ -1,4 +1,4 @@
-## Unreleased
+## v0.3.0 — 2026-09-15
 
 Reading emails is now safe by default — plain text, no remote image, a look at every link before
 it opens — plus a pass over the findings of a five-angle code review (bugs, security,
@@ -12,6 +12,7 @@ performance, UX, code quality).
 - **Removing a mail.tm address can delete the account on the server**, messages included (ticked by default in the remove dialog). Before, only the password was forgotten and the messages stayed seven days.
 - **More settings**: auto-refresh interval (30 s, 1 min, 5 min or manual only), forget old addresses (24 h, 7 or 30 days — local list only), block screenshots (FLAG_SECURE), theme (system, light, dark), copy a new address to the clipboard on creation.
 - **The create dialog preselects the last provider used.**
+- **Unread messages**: the badge on an address counts the messages never opened, and the inbox list shows them in bold.
 - **Delete button on every provider that supports it** — Guerrilla Mail and mail.tm, not only Maildrop. The message disappears from the list at once, without a refetch.
 - **Feedback while an address is created.** The dialog stays open with a progress line, Create disabled, and closes by itself when the new inbox opens; a failure shows on that same line, and Cancel abandons the creation.
 - **Dark mode**: dark window from the first frame, and HTML emails darkened in the message view.
