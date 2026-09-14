@@ -38,7 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,6 +72,7 @@ import com.example.trashmails.ui.ProviderLogo
 import com.example.trashmails.ui.copyToClipboard
 import com.example.trashmails.ui.formatDuration
 import com.example.trashmails.ui.formatRemaining
+import com.example.trashmails.ui.rememberMessageHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,9 +81,11 @@ fun HomeScreen(
     counts: Map<String, Int>,
     creating: Boolean,
     error: String?,
+    notice: String?,
     quotas: Map<Provider, CreationQuota.Status>,
     onOpenCreate: () -> Unit,
-    onDismissError: () -> Unit,
+    onDismissError: (String) -> Unit,
+    onDismissNotice: (String) -> Unit,
     onCancelCreate: () -> Unit,
     onOpen: (Inbox) -> Unit,
     onDelete: (Inbox) -> Unit,
@@ -91,6 +94,8 @@ fun HomeScreen(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var toDelete by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    // While the create dialog is open its errors are shown inside it.
+    val host = rememberMessageHost(error?.takeIf { !showDialog }, notice, onDismissError, onDismissNotice)
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("TrashMails") }) },
@@ -99,15 +104,7 @@ fun HomeScreen(
                 Icon(Icons.Default.Add, contentDescription = "New address")
             }
         },
-        snackbarHost = {
-            // While the create dialog is open its errors are shown inside it.
-            error?.takeIf { !showDialog }?.let {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = onDismissError) { Text("OK") } },
-                ) { Text(it) }
-            }
-        },
+        snackbarHost = { SnackbarHost(host) },
     ) { padding ->
         if (inboxes.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -144,7 +141,7 @@ fun HomeScreen(
             creating = creating,
             error = error,
             quotas = quotas,
-            onDismiss = { showDialog = false; onCancelCreate(); onDismissError() },
+            onDismiss = { showDialog = false; onCancelCreate(); error?.let(onDismissError) },
             onCreate = onCreate,
         )
     }

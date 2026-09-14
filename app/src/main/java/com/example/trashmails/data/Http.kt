@@ -52,4 +52,4 @@ fun sanitizeName(raw: String?): String? =
         ?.takeIf { it.isNotBlank() }
 
 /** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401), [body] explain. */
-class HttpException(val code: Int, host: String, val body: String = "") : ProviderException("HTTP $code from $host")
+class HttpException(val code: Int, host: String, val body: String = "") : ProviderException("$host answered HTTP $code")

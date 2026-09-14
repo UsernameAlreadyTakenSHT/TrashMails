@@ -22,9 +22,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,6 +38,7 @@ import com.example.trashmails.data.MailSummary
 import com.example.trashmails.ui.CopyIcon
 import com.example.trashmails.ui.copyToClipboard
 import com.example.trashmails.ui.formatDate
+import com.example.trashmails.ui.rememberMessageHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,12 +48,15 @@ fun InboxScreen(
     loading: Boolean,
     loaded: Boolean,
     error: String?,
+    notice: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpen: (MailSummary) -> Unit,
-    onDismissError: () -> Unit,
+    onDismissError: (String) -> Unit,
+    onDismissNotice: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val host = rememberMessageHost(error, notice, onDismissError, onDismissNotice)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,14 +77,7 @@ fun InboxScreen(
                 },
             )
         },
-        snackbarHost = {
-            error?.let {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = onDismissError) { Text("OK") } },
-                ) { Text(it) }
-            }
-        },
+        snackbarHost = { SnackbarHost(host) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
@@ -90,8 +86,8 @@ fun InboxScreen(
                     Text(
                         when {
                             loaded -> "Inbox is empty.\nAuto-refresh every minute."
-                            error != null -> "Could not load the inbox.\nAuto-refresh every minute."
-                            else -> "Loading…"
+                            loading -> "Loading…"
+                            else -> "Could not load the inbox.\nAuto-refresh every minute."
                         },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -63,7 +63,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** The open message body is being fetched. */
     var messageLoading by mutableStateOf(false)
         private set
+    /** Something failed; shown with an OK action. */
     var error by mutableStateOf<String?>(null)
+        private set
+    /** Plain information (e.g. the refresh throttle); shown briefly, not as a failure. */
+    var notice by mutableStateOf<String?>(null)
         private set
     /** Creation quota per provider (rolling 24 h), refreshed by [refreshQuota]. */
     var quotas by mutableStateOf(Provider.entries.associateWith { quota.status(it) })
@@ -101,7 +105,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        error = e.message?.takeIf { it.isNotBlank() } ?: fallback
+        error = e.userMessage(fallback)
         null
     }
 
@@ -197,9 +201,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun back() {
+        error = null
+        notice = null
         when (val s = screen) {
-            is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox); error = null }
-            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList(); error = null }
+            is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox) }
+            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList() }
             Screen.Home -> Unit
         }
     }
@@ -209,7 +215,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         if (lastFetchKey == inbox.key) {
             val wait = MANUAL_REFRESH_MIN_MS - (System.currentTimeMillis() - lastFetchAt)
             if (wait > 0) {
-                error = "Refresh available in ${(wait / 1000) + 1} s"
+                notice = "Refresh available in ${(wait / 1000) + 1} s"
                 return
             }
         }
@@ -255,7 +261,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         listLoading = false
     }
 
-    fun clearError() { error = null }
+    /** Clears [error] if it still is [shown] (a newer error that replaced it stays). */
+    fun clearError(shown: String) { if (error == shown) error = null }
+
+    fun clearNotice(shown: String) { if (notice == shown) notice = null }
 
     private companion object {
         const val POLL_INTERVAL_MS = 60_000L
