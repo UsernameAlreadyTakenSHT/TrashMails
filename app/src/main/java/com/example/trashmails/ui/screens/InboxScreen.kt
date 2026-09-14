@@ -70,7 +70,7 @@ fun InboxScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
-                    IconButton(onClick = { context.copyToClipboard(inbox.address) }) {
+                    IconButton(onClick = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") }) {
                         Icon(CopyIcon, contentDescription = "Copy address")
                     }
                     IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }

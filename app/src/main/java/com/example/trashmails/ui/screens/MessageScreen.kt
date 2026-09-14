@@ -66,7 +66,7 @@ fun MessageScreen(
                 },
                 actions = {
                     val body = content?.text ?: content?.html?.let(::htmlToText)
-                    if (body != null) IconButton(onClick = { context.copyToClipboard(body) }) {
+                    if (body != null) IconButton(onClick = { context.copyToClipboard(body, "Message text copied", sensitive = true) }) {
                         Icon(CopyIcon, contentDescription = "Copy content")
                     }
                     if (onDelete != null) IconButton(onClick = onDelete) {

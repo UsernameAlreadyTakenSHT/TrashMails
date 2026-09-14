@@ -128,7 +128,7 @@ fun HomeScreen(
                         inbox = inbox,
                         count = counts[inbox.key],
                         onClick = { onOpen(inbox) },
-                        onCopy = { context.copyToClipboard(inbox.address) },
+                        onCopy = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") },
                         onDelete = { toDelete = inbox.key },
                     )
                 }
