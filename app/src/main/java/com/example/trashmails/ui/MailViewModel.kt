@@ -14,7 +14,9 @@ import com.example.trashmails.data.MailProvider
 import com.example.trashmails.data.MailSummary
 import com.example.trashmails.data.Provider
 import com.example.trashmails.data.providers.BurnerKiwiProvider
+import com.example.trashmails.data.providers.GuerrillaMailProvider
 import com.example.trashmails.data.providers.InboxKittenProvider
+import com.example.trashmails.data.providers.MailTmProvider
 import com.example.trashmails.data.providers.MaildropProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,7 +33,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val store = InboxStore(app)
     private val quota = CreationQuota(app)
     private val providers: Map<Provider, MailProvider> = listOf(
-        InboxKittenProvider(), BurnerKiwiProvider(), MaildropProvider(),
+        InboxKittenProvider(), MaildropProvider(), GuerrillaMailProvider(), MailTmProvider(), BurnerKiwiProvider(),
     ).associateBy { it.provider }
 
     var inboxes by mutableStateOf(store.load())
@@ -64,6 +66,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun createInbox(provider: Provider, name: String?) {
+        provider.unavailableReason?.let { error = "${provider.label} is unavailable: $it"; return }
         val status = quota.status(provider)
         if (status.exhausted) {
             error = "${provider.label}: limit of ${status.limit} per 24 h reached"

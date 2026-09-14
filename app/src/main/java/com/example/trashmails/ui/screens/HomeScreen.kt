@@ -12,22 +12,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,9 +51,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.trashmails.data.CreationQuota
 import com.example.trashmails.data.Inbox
 import com.example.trashmails.data.Provider
@@ -144,6 +154,19 @@ fun HomeScreen(
     }
 }
 
+/** The address on one line, shrinking the font when it would not fit. */
+@Composable
+private fun AddressLine(address: String) {
+    Text(
+        address,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        softWrap = false,
+        autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp),
+    )
+}
+
 @Composable
 private fun InboxCard(
     inbox: Inbox,
@@ -158,7 +181,7 @@ private fun InboxCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(inbox.address, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                AddressLine(inbox.address)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ProviderLogo(inbox.provider, 28.dp)
@@ -187,6 +210,7 @@ private fun CreateInboxDialog(
 ) {
     var provider by rememberSaveable { mutableStateOf(Provider.INBOX_KITTEN) }
     var name by rememberSaveable { mutableStateOf("") }
+    var infoFor by rememberSaveable { mutableStateOf<Provider?>(null) }
     val status = quotas[provider]
     val exhausted = status?.exhausted == true
 
@@ -199,13 +223,22 @@ private fun CreateInboxDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Provider.entries.forEach { p ->
-                        ProviderRow(
-                            p,
-                            selected = provider == p,
-                            exhausted = quotas[p]?.exhausted == true,
-                            onClick = { provider = p },
+                    providerGroups().forEach { (title, providers) ->
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
                         )
+                        providers.forEach { p ->
+                            ProviderRow(
+                                p,
+                                selected = provider == p,
+                                exhausted = quotas[p]?.exhausted == true,
+                                onClick = { if (p.available) provider = p },
+                                onInfo = { infoFor = p },
+                            )
+                        }
                     }
                 }
                 QuotaLine(status)
@@ -225,17 +258,6 @@ private fun CreateInboxDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                HorizontalDivider()
-                // All three blocks are stacked (only the selected one is visible), so the
-                // dialog height is always that of the tallest block and never jumps.
-                Box {
-                    Provider.entries.forEach { p ->
-                        Column(
-                            Modifier.alpha(if (p == provider) 1f else 0f),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) { RetentionDetails(p) }
-                    }
-                }
             }
         },
         confirmButton = {
@@ -245,6 +267,62 @@ private fun CreateInboxDialog(
             ) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+
+    infoFor?.let { p -> ProviderInfoDialog(p, onDismiss = { infoFor = null }) }
+}
+
+/** Providers grouped under a section title; inside a group the unavailable ones sink to the bottom. */
+private fun providerGroups(): List<Pair<String, List<Provider>>> {
+    val all = Provider.entries.sortedBy { !it.available }
+    return listOf(
+        "Open source" to all.filter { it.openSource },
+        "Closed source" to all.filter { !it.openSource },
+    ).filter { it.second.isNotEmpty() }
+}
+
+/** The (i) popup: retention rules, source code link, and the outage note when there is one. */
+@Composable
+private fun ProviderInfoDialog(provider: Provider, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(provider.label) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                provider.unavailableReason?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                RetentionDetails(provider)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Links", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    LinkLine("Website", provider.siteUrl)
+                    LinkLine("Privacy policy", provider.privacyUrl, missing = "none published")
+                    LinkLine("Source code", provider.sourceUrl, missing = "not published (closed source)")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
+}
+
+/** One line "Label: url", the url tappable (opens the browser); [missing] is shown when there is no url. */
+@Composable
+private fun LinkLine(label: String, url: String?, missing: String = "") {
+    val linkStyle = TextLinkStyles(
+        style = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline),
+    )
+    Text(
+        buildAnnotatedString {
+            append("$label: ")
+            if (url == null) append(missing)
+            else withLink(LinkAnnotation.Url(url, linkStyle)) { append(url.removePrefix("https://").removePrefix("www.").trimEnd('/')) }
+        },
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -262,6 +340,28 @@ private fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
             "Removing the address only forgets it in this app.",
         ),
         warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
+    )
+    Provider.GUERRILLA_MAIL -> RetentionInfo(
+        mails = listOf(
+            "Kept on the server for 1 hour, then deleted automatically.",
+            "Can be deleted manually from this app.",
+        ),
+        account = listOf(
+            "There is no account: the inbox only exists by its name.",
+            "Removing the address only forgets it in this app.",
+        ),
+        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
+    )
+    Provider.MAIL_TM -> RetentionInfo(
+        mails = listOf(
+            "Kept on the server for 7 days, then deleted automatically.",
+            "Can be deleted manually from this app.",
+        ),
+        account = listOf(
+            "A real account (address + password) that mail.tm keeps until it is deleted.",
+            "Removing the address only forgets it in this app; the password is lost with it, so nobody can open the inbox anymore.",
+        ),
+        warning = null,
     )
     Provider.BURNER_KIWI -> RetentionInfo(
         mails = listOf(
@@ -298,7 +398,7 @@ private fun RemoveInboxDialog(inbox: Inbox, onConfirm: () -> Unit, onDismiss: ()
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(inbox.address, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                AddressLine(inbox.address)
                 Text(
                     "The address will be removed from this app. Here is what happens on ${inbox.provider.label}'s side:",
                     style = MaterialTheme.typography.bodyMedium,
@@ -336,31 +436,51 @@ private fun RetentionDetails(provider: Provider) {
 }
 
 @Composable
-private fun ProviderRow(provider: Provider, selected: Boolean, exhausted: Boolean, onClick: () -> Unit) {
+private fun ProviderRow(
+    provider: Provider,
+    selected: Boolean,
+    exhausted: Boolean,
+    onClick: () -> Unit,
+    onInfo: () -> Unit,
+) {
+    val unavailable = !provider.available
     Row(
         Modifier
             .fillMaxWidth()
-            .alpha(if (exhausted) 0.5f else 1f)
             .clip(RoundedCornerShape(12.dp))
             .background(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             )
-            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .selectable(selected = selected, enabled = !unavailable, onClick = onClick, role = Role.RadioButton)
+            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ProviderLogo(provider, 44.dp)
-        Column(Modifier.weight(1f)) {
-            Text(provider.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        // Only the identity dims when the row cannot be picked: the (i) stays fully usable.
+        val dim = Modifier.alpha(if (exhausted || unavailable) 0.5f else 1f)
+        ProviderLogo(provider, 44.dp, dim)
+        Column(Modifier.weight(1f).then(dim)) {
             Text(
-                provider.domainHint,
+                provider.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (unavailable) "Unavailable" else provider.domainHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = if (unavailable) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        RadioButton(selected = selected, onClick = null)
+        IconButton(onClick = onInfo, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Outlined.Info, contentDescription = "About ${provider.label}")
+        }
+        RadioButton(selected = selected, onClick = null, enabled = !unavailable, modifier = dim.size(36.dp))
     }
 }
 

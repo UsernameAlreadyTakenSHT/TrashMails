@@ -25,10 +25,13 @@ object Http {
                 .apply { headers.forEach { (k, v) -> header(k, v) } }.build()
         )
 
+    suspend fun delete(url: String, headers: Map<String, String> = emptyMap()): String =
+        execute(Request.Builder().url(url).delete().apply { headers.forEach { (k, v) -> header(k, v) } }.build())
+
     private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw ProviderException("HTTP ${resp.code} from ${request.url.host}")
+            if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host)
             text
         }
     }
@@ -44,3 +47,6 @@ fun sanitizeName(raw: String?): String? =
     raw?.trim()?.substringBefore('@')?.lowercase()
         ?.filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
         ?.takeIf { it.isNotBlank() }
+
+/** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401). */
+class HttpException(val code: Int, host: String) : ProviderException("HTTP $code from $host")
