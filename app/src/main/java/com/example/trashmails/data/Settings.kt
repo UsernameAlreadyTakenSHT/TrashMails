@@ -12,6 +12,8 @@ data class Settings(
     val confirmLinks: Boolean = true,
     /** Seconds between two automatic listings of the open inbox; 0 lists only on demand. */
     val pollIntervalSec: Int = 60,
+    /** FLAG_SECURE: no screenshots, no preview in the recent apps (verification codes stay in the app). */
+    val blockScreenshots: Boolean = false,
 ) {
     val pollIntervalMs: Long get() = pollIntervalSec * 1000L
     val autoRefresh: Boolean get() = pollIntervalSec > 0
@@ -33,6 +35,7 @@ class SettingsStore(context: Context) {
             loadImages = prefs.getBoolean(LOAD_IMAGES, defaults.loadImages),
             confirmLinks = prefs.getBoolean(CONFIRM_LINKS, defaults.confirmLinks),
             pollIntervalSec = prefs.getInt(POLL_INTERVAL, defaults.pollIntervalSec),
+            blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
         )
     }
 
@@ -42,6 +45,7 @@ class SettingsStore(context: Context) {
             .putBoolean(LOAD_IMAGES, s.loadImages)
             .putBoolean(CONFIRM_LINKS, s.confirmLinks)
             .putInt(POLL_INTERVAL, s.pollIntervalSec)
+            .putBoolean(BLOCK_SCREENSHOTS, s.blockScreenshots)
             .apply()
     }
 
@@ -50,5 +54,6 @@ class SettingsStore(context: Context) {
         const val LOAD_IMAGES = "load_images"
         const val CONFIRM_LINKS = "confirm_links"
         const val POLL_INTERVAL = "poll_interval_sec"
+        const val BLOCK_SCREENSHOTS = "block_screenshots"
     }
 }

@@ -87,6 +87,15 @@ fun SettingsScreen(
                 selected = settings.pollIntervalSec,
                 onSelect = { onChange(settings.copy(pollIntervalSec = it)) },
             )
+
+            SectionTitle("Privacy")
+            SettingRow(
+                title = "Block screenshots",
+                description = "The app cannot be captured or screen-recorded, and shows blank in the recent apps: " +
+                    "verification codes stay on the screen only.",
+                checked = settings.blockScreenshots,
+                onCheckedChange = { onChange(settings.copy(blockScreenshots = it)) },
+            )
         }
     }
 }

@@ -1,12 +1,14 @@
 package com.example.trashmails
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import com.example.trashmails.ui.MailViewModel
 import com.example.trashmails.ui.Screen
 import com.example.trashmails.ui.screens.HomeScreen
@@ -22,6 +24,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            // FLAG_SECURE follows the setting live, so toggling it needs no restart.
+            val blockScreenshots = vm.settings.blockScreenshots
+            LaunchedEffect(blockScreenshots) {
+                if (blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
             TrashMailsTheme { App(vm) }
         }
     }
