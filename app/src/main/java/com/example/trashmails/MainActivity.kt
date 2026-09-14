@@ -1,5 +1,7 @@
 package com.example.trashmails
 
+import android.app.UiModeManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -7,8 +9,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.example.trashmails.data.Settings
 import com.example.trashmails.ui.MailViewModel
 import com.example.trashmails.ui.Screen
 import com.example.trashmails.ui.screens.HomeScreen
@@ -30,8 +34,33 @@ class MainActivity : ComponentActivity() {
                 if (blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
-            TrashMailsTheme { App(vm) }
+            val theme = vm.settings.theme
+            LaunchedEffect(theme) { applyNightMode(theme) }
+            TrashMailsTheme(
+                darkTheme = when (theme) {
+                    Settings.THEME_LIGHT -> false
+                    Settings.THEME_DARK -> true
+                    else -> isSystemInDarkTheme()
+                },
+            ) { App(vm) }
         }
+    }
+
+    /**
+     * From Android 12 the whole app configuration can follow the chosen theme, so the window
+     * background, the values-night resources and the message WebView switch with it; before that
+     * only the Compose colours do.
+     */
+    private fun applyNightMode(theme: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val manager = getSystemService(UiModeManager::class.java) ?: return
+        manager.setApplicationNightMode(
+            when (theme) {
+                Settings.THEME_LIGHT -> UiModeManager.MODE_NIGHT_NO
+                Settings.THEME_DARK -> UiModeManager.MODE_NIGHT_YES
+                else -> UiModeManager.MODE_NIGHT_AUTO
+            }
+        )
     }
 
     override fun onStart() {

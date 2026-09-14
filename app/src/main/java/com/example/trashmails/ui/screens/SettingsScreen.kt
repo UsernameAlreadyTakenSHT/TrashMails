@@ -105,6 +105,15 @@ fun SettingsScreen(
                 checked = settings.blockScreenshots,
                 onCheckedChange = { onChange(settings.copy(blockScreenshots = it)) },
             )
+
+            SectionTitle("Appearance")
+            ChoiceRow(
+                title = "Theme",
+                description = "",
+                choices = Settings.THEMES,
+                selected = settings.theme,
+                onSelect = { onChange(settings.copy(theme = it)) },
+            )
         }
     }
 }
@@ -168,7 +177,9 @@ private fun <T> ChoiceRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (description.isNotEmpty()) {
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
     if (open) AlertDialog(
         onDismissRequest = { open = false },
