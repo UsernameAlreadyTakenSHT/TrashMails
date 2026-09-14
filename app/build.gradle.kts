@@ -40,8 +40,9 @@ android {
 
     buildTypes {
         release {
+            // R8: code shrinking + resource shrinking (the debug variant stays unoptimised).
             optimization {
-                enable = false
+                enable = true
             }
             if (keystoreProps.isNotEmpty()) signingConfig = signingConfigs.getByName("release")
         }
