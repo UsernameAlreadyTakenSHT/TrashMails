@@ -195,7 +195,7 @@ private fun InboxCard(
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ProviderLogo(inbox.provider, 28.dp)
-                    count?.let { Badge { Text("$it") } }
+                    count?.takeIf { it > 0 }?.let { Badge { Text("$it") } }
                     formatRemaining(inbox.expiresAt)?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

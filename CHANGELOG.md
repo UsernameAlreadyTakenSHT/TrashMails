@@ -1,9 +1,14 @@
 ## Unreleased
 
-A pass over the findings of a five-angle code review (bugs, security, performance, UX, code
-quality): nothing new to do in the app, but most of what could go wrong under the hood no longer does.
+Reading emails is now safe by default — plain text, no remote image, a look at every link before
+it opens — plus a pass over the findings of a five-angle code review (bugs, security,
+performance, UX, code quality).
 
 ### Added
+- **Settings screen** (the small button above the +), three switches with the safe side as default: render HTML emails (off), load remote images (off), confirm before opening links (on).
+- **Emails are shown as plain text** unless HTML rendering is on: nothing the sender wrote is rendered or fetched. The HTML is converted to text with links spelled out after their anchor text. A single message can be viewed as HTML, and back, from its menu.
+- **Remote images are blocked** when an email is rendered as HTML — images, styles, fonts and frames alike, so the sender cannot tell the email was opened. A banner and a menu entry load them for that message only.
+- **Links are confirmed before they open**: a dialog shows the site (or the address, for mailto:) in large type and the full URL, with Open, Copy link and Cancel.
 - **Delete button on every provider that supports it** — Guerrilla Mail and mail.tm, not only Maildrop. The message disappears from the list at once, without a refetch.
 - **Feedback while an address is created.** The dialog stays open with a progress line, Create disabled, and closes by itself when the new inbox opens; a failure shows on that same line, and Cancel abandons the creation.
 - **Dark mode**: dark window from the first frame, and HTML emails darkened in the message view.

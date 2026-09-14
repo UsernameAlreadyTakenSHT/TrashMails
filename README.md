@@ -29,7 +29,9 @@ service comes back.
 
 - Several inboxes side by side, persisted locally
 - Auto-refresh every minute while an inbox is open (paused when the app is in the background), manual refresh (max once per 30 s)
-- HTML emails rendered in a WebView (JavaScript disabled, links open in the browser), plain-text fallback, dark mode
+- Emails shown as plain text by default; HTML rendering (JavaScript disabled, remote images blocked unless asked) globally or per message, dark mode
+- Links are confirmed before leaving the app (site and full address shown), and only http(s) and mailto links can be opened
+- Settings: render HTML, load remote images, confirm links — all default to the safe side
 - Copy the address or the message text to the clipboard
 - Retention rules, website, privacy policy and source repository of each provider behind an (i) button (retention shown again when removing an address)
 - Courtesy creation quota per rolling 24 h: 20 per provider (10 for mail.tm, 5 for Burner Kiwi)
@@ -56,10 +58,12 @@ app/src/main/java/com/example/trashmails/
 │   ├── Http.kt              OkHttp client, name helpers
 │   ├── InboxStore.kt        Local persistence of inboxes
 │   ├── CreationQuota.kt     Per-provider creation rate limit
+│   ├── Settings.kt          User preferences
 │   └── providers/           One implementation per provider
 ├── ui/
 │   ├── MailViewModel.kt     State, navigation, polling
-│   └── screens/             Home, inbox and message screens
+│   ├── HtmlText.kt          HTML email to plain text
+│   └── screens/             Home, inbox, message and settings screens
 └── ui/theme/                Material 3 theme
 ```
 
