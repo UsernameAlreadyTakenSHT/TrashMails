@@ -378,7 +378,7 @@ private fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         mails = listOf(
             "Kept on the server: 10 messages max (oldest are overwritten).",
             "The inbox is emptied after 24 h without a new email.",
-            "This app never deletes anything on the server.",
+            "Can be deleted manually from this app.",
         ),
         account = listOf(
             "There is no account: the inbox only exists by its name.",

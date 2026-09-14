@@ -65,6 +65,8 @@ class MaildropProvider : MailProvider {
         return MailContent(html = html, text = if (html == null) raw else null)
     }
 
+    override val canDeleteMessages get() = true
+
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
         val data = query(
             "mutation(\$m: String!, \$id: String!) { delete(mailbox: \$m, id: \$id) }",

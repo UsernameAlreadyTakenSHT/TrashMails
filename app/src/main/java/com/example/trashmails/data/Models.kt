@@ -61,6 +61,8 @@ interface MailProvider {
     suspend fun createInbox(name: String?): Inbox
     suspend fun listMessages(inbox: Inbox): List<MailSummary>
     suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent
+    /** Whether [deleteMessage] does anything on the server; the delete button is only shown when true. */
+    val canDeleteMessages: Boolean get() = false
     suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean = false
 }
 

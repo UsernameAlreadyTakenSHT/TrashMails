@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
-import com.example.trashmails.data.Provider
 import com.example.trashmails.ui.MailViewModel
 import com.example.trashmails.ui.Screen
 import com.example.trashmails.ui.screens.HomeScreen
@@ -61,7 +60,7 @@ private fun App(vm: MailViewModel) {
             loading = vm.loading,
             error = vm.error,
             onBack = vm::back,
-            onDelete = if (s.inbox.provider == Provider.MAILDROP) {
+            onDelete = if (vm.canDeleteMessages(s.inbox)) {
                 { vm.deleteMessage(s.inbox, s.summary); vm.back() }
             } else null,
         )

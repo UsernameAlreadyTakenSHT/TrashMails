@@ -82,6 +82,8 @@ class GuerrillaMailProvider : MailProvider {
         return MailContent(html = body, text = null)
     }
 
+    override val canDeleteMessages get() = true
+
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
         val sid = summary.ref["sid"] ?: attach(inbox.id).getString("sid_token")
         get("del_email", "&email_ids%5B%5D=${enc(summary.id)}&sid_token=$sid")

@@ -61,6 +61,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun providerFor(inbox: Inbox) = providers.getValue(inbox.provider)
 
+    fun canDeleteMessages(inbox: Inbox) = providerFor(inbox).canDeleteMessages
+
     fun refreshQuota() {
         quotas = Provider.entries.associateWith { quota.status(it) }
     }

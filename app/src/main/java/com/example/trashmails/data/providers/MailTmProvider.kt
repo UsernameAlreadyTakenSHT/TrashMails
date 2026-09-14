@@ -109,6 +109,8 @@ class MailTmProvider : MailProvider {
         return MailContent(html = html, text = m.optString("text").takeIf { it.isNotBlank() })
     }
 
+    override val canDeleteMessages get() = true
+
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
         authed(inbox) { h -> Http.delete("$BASE/messages/${summary.id}", h) }
         return true
