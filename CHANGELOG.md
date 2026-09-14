@@ -18,6 +18,7 @@ performance, UX, code quality).
 - **Unit tests** for the mailbox-name helpers.
 
 ### Changed
+- **New application id `io.github.usernamealreadytakensht.trashmails`** (was the template's `com.example.trashmails`, which stores refuse). Android sees a different app: this version does not install over 0.2.0 — uninstall it first; the addresses it held are lost, so remove the mail.tm ones from the old version beforehand if you want their accounts deleted.
 - **Links in an email open in the browser** (`mailto:` in the mail app). Anything else — `intent://`, `tel:`, another app's deep link — is dropped, and nothing ever navigates inside the message view.
 - **Readable errors.** "No internet connection", "The server took too long to answer", "Unexpected reply from the server"… instead of the exception's own text. Errors sit in a Material snackbar (announced by TalkBack, swipeable, auto-dismissed with an OK action); the refresh throttle is a short notice, no longer an error.
 - **Polling pauses in the background** and resumes on return, waiting out what is left of the minute.

@@ -12,13 +12,13 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.example.trashmails"
+    namespace = "io.github.usernamealreadytakensht.trashmails"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.trashmails"
+        applicationId = "io.github.usernamealreadytakensht.trashmails"
         minSdk = 29
         targetSdk = 37
         versionCode = 2

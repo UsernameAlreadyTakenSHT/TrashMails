@@ -52,7 +52,7 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Minimum Andro
 ## Structure
 
 ```
-app/src/main/java/com/example/trashmails/
+app/src/main/java/io/github/usernamealreadytakensht/trashmails/
 ├── data/
 │   ├── Models.kt            Provider enum, Inbox, MailSummary, MailProvider interface
 │   ├── Http.kt              OkHttp client, name helpers
