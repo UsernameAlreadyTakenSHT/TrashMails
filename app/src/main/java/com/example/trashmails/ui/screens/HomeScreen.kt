@@ -457,13 +457,13 @@ private fun ProviderRow(
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             )
             .selectable(selected = selected, enabled = !unavailable, onClick = onClick, role = Role.RadioButton)
-            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+            .padding(start = 12.dp, top = 2.dp, bottom = 2.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Only the identity dims when the row cannot be picked: the (i) stays fully usable.
         val dim = Modifier.alpha(if (exhausted || unavailable) 0.5f else 1f)
-        ProviderLogo(provider, 44.dp, dim)
+        ProviderLogo(provider, 44.dp, dim, described = false)
         Column(Modifier.weight(1f).then(dim)) {
             Text(
                 provider.label,
@@ -481,7 +481,7 @@ private fun ProviderRow(
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        IconButton(onClick = onInfo, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onInfo) {
             Icon(Icons.Outlined.Info, contentDescription = "About ${provider.label}")
         }
         RadioButton(selected = selected, onClick = null, enabled = !unavailable, modifier = dim.size(36.dp))

@@ -26,12 +26,15 @@ fun providerLogo(provider: Provider): Int = when (provider) {
     Provider.MAILDROP -> R.drawable.logo_maildrop
 }
 
-/** Provider logo in a white rounded tile, scaled to fit. */
+/**
+ * Provider logo in a white rounded tile, scaled to fit. [described] false when the provider name
+ * is written next to it, so screen readers do not announce it twice.
+ */
 @Composable
-fun ProviderLogo(provider: Provider, size: Dp, modifier: Modifier = Modifier) {
+fun ProviderLogo(provider: Provider, size: Dp, modifier: Modifier = Modifier, described: Boolean = true) {
     Image(
         painter = painterResource(providerLogo(provider)),
-        contentDescription = provider.label,
+        contentDescription = if (described) provider.label else null,
         contentScale = ContentScale.Fit,
         modifier = modifier
             .size(size)
