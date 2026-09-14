@@ -96,6 +96,13 @@ fun SettingsScreen(
                 selected = settings.forgetAfterHours,
                 onSelect = { onChange(settings.copy(forgetAfterHours = it)) },
             )
+            HorizontalDivider()
+            SettingRow(
+                title = "Copy new addresses",
+                description = "A freshly created address goes straight to the clipboard.",
+                checked = settings.copyOnCreate,
+                onCheckedChange = { onChange(settings.copy(copyOnCreate = it)) },
+            )
 
             SectionTitle("Privacy")
             SettingRow(

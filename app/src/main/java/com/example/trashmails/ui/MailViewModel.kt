@@ -188,6 +188,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 quota.record(provider)
                 refreshQuota()
             }
+            if (settings.lastProvider != provider) updateSettings(settings.copy(lastProvider = provider))
+            if (settings.copyOnCreate) getApplication<Application>().copyToClipboard(inbox.address, "Copied: ${inbox.address}")
             openInbox(inbox)
         }
     }
