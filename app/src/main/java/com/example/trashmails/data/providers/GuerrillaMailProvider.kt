@@ -12,6 +12,7 @@ import com.example.trashmails.data.sanitizeName
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Guerrilla Mail: a public inbox addressed by name, read through a session token (`sid_token`).
@@ -29,7 +30,7 @@ class GuerrillaMailProvider : MailProvider {
     }
 
     /** Session token per inbox name. */
-    private val sids = HashMap<String, String>()
+    private val sids = ConcurrentHashMap<String, String>()
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 

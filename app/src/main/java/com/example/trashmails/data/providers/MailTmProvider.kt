@@ -13,6 +13,7 @@ import com.example.trashmails.data.sanitizeName
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.OffsetDateTime
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * mail.tm: a private inbox behind an account (address + password) and a bearer token.
@@ -27,7 +28,7 @@ class MailTmProvider : MailProvider {
     }
 
     /** JWT per inbox id, for this process lifetime. */
-    private val jwts = HashMap<String, String>()
+    private val jwts = ConcurrentHashMap<String, String>()
 
     private suspend fun activeDomain(): String {
         val arr = JSONObject(Http.get("$BASE/domains")).optJSONArray("hydra:member") ?: JSONArray()

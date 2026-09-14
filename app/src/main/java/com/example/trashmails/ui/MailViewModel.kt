@@ -19,10 +19,12 @@ import com.example.trashmails.data.providers.InboxKittenProvider
 import com.example.trashmails.data.providers.MailTmProvider
 import com.example.trashmails.data.providers.MaildropProvider
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface Screen {
     data object Home : Screen
@@ -97,11 +99,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Runs [block] and returns its result, or null after storing a user-facing [error].
-     * Cancellation propagates untouched so a job cancelled by navigation leaves no trace.
+     * Runs [block] off the main thread (the providers parse their JSON right after the network
+     * call) and returns its result, or null after storing a user-facing [error]. Cancellation
+     * propagates untouched so a job cancelled by navigation leaves no trace.
      */
-    private inline fun <T> attempt(fallback: String, block: () -> T): T? = try {
-        block()
+    private suspend inline fun <T> attempt(fallback: String, crossinline block: suspend () -> T): T? = try {
+        withContext(Dispatchers.Default) { block() }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
