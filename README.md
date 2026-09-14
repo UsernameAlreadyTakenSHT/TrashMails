@@ -35,7 +35,7 @@ service comes back.
 - Courtesy creation quota per rolling 24 h: 20 per provider (10 for mail.tm, 5 for Burner Kiwi)
 
 No backend, no tracking: the app only talks to the providers' public APIs. The only "account" is the
-one mail.tm requires (a random password kept on the device).
+one mail.tm requires (a random password kept on the device, excluded from Android's cloud backup: the app opts out of backup altogether).
 
 ## Build
 
