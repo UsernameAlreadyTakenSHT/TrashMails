@@ -1,5 +1,8 @@
 # TrashMails
 
+> Personal project, built with AI assistance (Claude Code). No store release is planned: releases are
+> published here on GitHub only (installable with [Obtainium](https://github.com/ImranR98/Obtainium)).
+
 Android app to create and read disposable email inboxes from three free providers:
 
 | Provider | Address | Notes |
