@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark counterpart of values/themes.xml: the window is dark from the first frame. -->
+    <style name="Theme.TrashMails" parent="android:Theme.Material.NoActionBar" />
+</resources>
