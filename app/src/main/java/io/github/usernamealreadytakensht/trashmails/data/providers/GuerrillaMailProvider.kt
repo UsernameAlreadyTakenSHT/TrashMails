@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
+import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -21,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
  * `get_email_list` with statistics only (no `list`), or `fetch_email` with the literal `false`.
  * Either answer triggers one re-attach and retry. Emails are kept one hour.
  */
-class GuerrillaMailProvider : MailProvider {
+class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.GUERRILLA_MAIL
 
     private companion object {
@@ -36,7 +37,7 @@ class GuerrillaMailProvider : MailProvider {
 
     /** One API call; the reply is whatever JSON value the endpoint returns (an object, or `false`). */
     private suspend fun call(f: String, params: String): Any? =
-        JSONTokener(Http.get("$BASE?f=$f&lang=en$params")).nextValue().also { value ->
+        JSONTokener(http.get("$BASE?f=$f&lang=en$params")).nextValue().also { value ->
             val auth = (value as? JSONObject)?.optJSONObject("auth")
             if (auth != null && !auth.optBoolean("success", true)) {
                 throw ProviderException("Guerrilla Mail: ${auth.optJSONArray("error_codes")?.join(", ") ?: "auth error"}")

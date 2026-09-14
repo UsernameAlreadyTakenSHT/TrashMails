@@ -1,0 +1,1 @@
+{"data":{"inbox":[{"id":"m1","headerfrom":"Alice   <alice@example.com>","mailfrom":"bounce@example.com","subject":"Hello\n   world","date":"2026-09-14T22:15:00.000Z"},{"id":"m2","headerfrom":"","mailfrom":"bob@example.com","subject":"Second","date":"2026-09-14T22:20:00.000Z"}]}}

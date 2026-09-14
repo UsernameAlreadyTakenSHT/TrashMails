@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
+import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -16,7 +17,7 @@ import java.net.URLEncoder
  * Inbox Kitten exposes raw Mailgun events.
  * `list?recipient=` is a prefix search: the exact address is filtered client-side.
  */
-class InboxKittenProvider : MailProvider {
+class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.INBOX_KITTEN
 
     private companion object {
@@ -30,7 +31,7 @@ class InboxKittenProvider : MailProvider {
     }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val body = Http.get("$BASE/list?recipient=${URLEncoder.encode(inbox.id, "UTF-8")}")
+        val body = http.get("$BASE/list?recipient=${URLEncoder.encode(inbox.id, "UTF-8")}")
         val arr = JSONArray(body)
         val seen = HashSet<String>()
         val out = ArrayList<MailSummary>()
@@ -57,7 +58,7 @@ class InboxKittenProvider : MailProvider {
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
         val key = summary.ref["key"] ?: throw ProviderException("Missing message key")
         val region = summary.ref["region"].orEmpty()
-        val html = Http.get(
+        val html = http.get(
             "$BASE/getHtml?key=${URLEncoder.encode(key, "UTF-8")}&region=${URLEncoder.encode(region, "UTF-8")}"
         )
         return MailContent(html = html, text = null)

@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
+import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
@@ -20,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
  * The password is what gets persisted ([Inbox.token]); the JWT is fetched on demand and kept in
  * memory only, refreshed once on 401. The domain is whichever one mail.tm currently offers.
  */
-class MailTmProvider : MailProvider {
+class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.MAIL_TM
 
     private companion object {
@@ -31,7 +32,7 @@ class MailTmProvider : MailProvider {
     private val jwts = ConcurrentHashMap<String, String>()
 
     private suspend fun activeDomain(): String {
-        val arr = JSONObject(Http.get("$BASE/domains")).optJSONArray("hydra:member") ?: JSONArray()
+        val arr = JSONObject(http.get("$BASE/domains")).optJSONArray("hydra:member") ?: JSONArray()
         for (i in 0 until arr.length()) {
             val d = arr.getJSONObject(i)
             if (d.optBoolean("isActive") && !d.optBoolean("isPrivate")) return d.getString("domain")
@@ -47,7 +48,7 @@ class MailTmProvider : MailProvider {
     private suspend fun jwt(inbox: Inbox, refresh: Boolean = false): String {
         if (!refresh) jwts[inbox.id]?.let { return it }
         val reply = try {
-            Http.postJson("$BASE/token", credentials(inbox))
+            http.postJson("$BASE/token", credentials(inbox))
         } catch (e: HttpException) {
             // Rejected credentials: the account was deleted (by mail.tm after inactivity, or elsewhere).
             if (e.code == 401) throw ProviderException("This mail.tm account no longer exists: remove the address")
@@ -75,7 +76,7 @@ class MailTmProvider : MailProvider {
         val password = randomName(24)
         val body = JSONObject().put("address", address).put("password", password).toString()
         val account = try {
-            JSONObject(Http.postJson("$BASE/accounts", body))
+            JSONObject(http.postJson("$BASE/accounts", body))
         } catch (e: HttpException) {
             throw when (e.code) {
                 422 -> ProviderException(violationMessage(e.body) ?: "This address is already taken")
@@ -92,7 +93,7 @@ class MailTmProvider : MailProvider {
     }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val json = authed(inbox) { h -> JSONObject(Http.get("$BASE/messages", h)) }
+        val json = authed(inbox) { h -> JSONObject(http.get("$BASE/messages", h)) }
         val arr = json.optJSONArray("hydra:member") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)
@@ -107,7 +108,7 @@ class MailTmProvider : MailProvider {
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
-        val m = authed(inbox) { h -> JSONObject(Http.get("$BASE/messages/${summary.id}", h)) }
+        val m = authed(inbox) { h -> JSONObject(http.get("$BASE/messages/${summary.id}", h)) }
         // `html` is documented as a list of parts; be tolerant if it ever comes as one string.
         val html = when (val h = m.opt("html")) {
             is JSONArray -> (0 until h.length()).joinToString("\n") { h.optString(it) }
@@ -120,7 +121,7 @@ class MailTmProvider : MailProvider {
     override val canDeleteMessages get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        authed(inbox) { h -> Http.delete("$BASE/messages/${summary.id}", h) }
+        authed(inbox) { h -> http.delete("$BASE/messages/${summary.id}", h) }
         return true
     }
 
@@ -128,7 +129,7 @@ class MailTmProvider : MailProvider {
 
     /** Deletes the account itself: every message goes with it and the address is freed. */
     override suspend fun deleteInbox(inbox: Inbox): Boolean {
-        authed(inbox) { h -> Http.delete("$BASE/accounts/${inbox.id}", h) }
+        authed(inbox) { h -> http.delete("$BASE/accounts/${inbox.id}", h) }
         jwts.remove(inbox.id)
         return true
     }

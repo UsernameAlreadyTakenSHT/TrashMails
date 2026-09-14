@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
+import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -13,7 +14,7 @@ import org.json.JSONObject
 import java.time.Instant
 
 /** Maildrop: public GraphQL API, no authentication. */
-class MaildropProvider : MailProvider {
+class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.MAILDROP
 
     private companion object {
@@ -24,7 +25,7 @@ class MaildropProvider : MailProvider {
 
     private suspend fun query(query: String, variables: Map<String, String>): JSONObject {
         val body = JSONObject().put("query", query).put("variables", JSONObject(variables)).toString()
-        val json = JSONObject(Http.postJson(ENDPOINT, body))
+        val json = JSONObject(http.postJson(ENDPOINT, body))
         json.optJSONArray("errors")?.takeIf { it.length() > 0 }?.let {
             throw ProviderException(it.getJSONObject(0).optString("message", "Maildrop error"))
         }

@@ -1,0 +1,1 @@
+{"@id":"/validation_errors/00000000000002a80000000000000000","@type":"ConstraintViolationList","status":422,"violations":[{"propertyPath":"address","message":"The username \"admin\" is not valid.","code":null}],"detail":"address: The username \"admin\" is not valid.","hydra:title":"An error occurred","hydra:description":"address: The username \"admin\" is not valid."}

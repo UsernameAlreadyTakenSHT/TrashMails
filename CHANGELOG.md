@@ -15,7 +15,7 @@ performance, UX, code quality).
 - **Delete button on every provider that supports it** — Guerrilla Mail and mail.tm, not only Maildrop. The message disappears from the list at once, without a refetch.
 - **Feedback while an address is created.** The dialog stays open with a progress line, Create disabled, and closes by itself when the new inbox opens; a failure shows on that same line, and Cancel abandons the creation.
 - **Dark mode**: dark window from the first frame, and HTML emails darkened in the message view.
-- **Unit tests** for the mailbox-name helpers.
+- **Unit tests**: the mailbox-name helpers, the HTML-to-text converter, and every provider parser against JSON fixtures (real replies where they could be captured) through an injected HTTP layer — including Guerrilla Mail session renewal, mail.tm token refresh and 422 details, Inbox Kitten recipient filtering.
 
 ### Changed
 - **New application id `io.github.usernamealreadytakensht.trashmails`** (was the template's `com.example.trashmails`, which stores refuse). Android sees a different app: this version does not install over 0.2.0 — uninstall it first; the addresses it held are lost, so remove the mail.tm ones from the old version beforehand if you want their accounts deleted.

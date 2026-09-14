@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
+import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -13,7 +14,7 @@ import org.json.JSONObject
  * Burner Kiwi: the address is generated server-side and a JWT token protects the inbox.
  * Message bodies are returned directly in the list call.
  */
-class BurnerKiwiProvider : MailProvider {
+class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.BURNER_KIWI
 
     private companion object {
@@ -31,7 +32,7 @@ class BurnerKiwiProvider : MailProvider {
 
     override suspend fun createInbox(name: String?): Inbox {
         // Inbox creation is a GET (POST returns 405).
-        val json = unwrap(Http.get(BASE))
+        val json = unwrap(http.get(BASE))
         val result = json.getJSONObject("result")
         val email = result.getJSONObject("email")
         return Inbox(
@@ -48,7 +49,7 @@ class BurnerKiwiProvider : MailProvider {
         mapOf("X-Burner-Key" to (inbox.token ?: throw ProviderException("Missing token")))
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val json = unwrap(Http.get("$BASE/${inbox.id}/messages", headers(inbox)))
+        val json = unwrap(http.get("$BASE/${inbox.id}/messages", headers(inbox)))
         val arr = json.optJSONArray("result") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)

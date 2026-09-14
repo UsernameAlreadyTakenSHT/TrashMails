@@ -10,7 +10,14 @@ import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
 
-object Http {
+/** The HTTP calls the providers make: the real one is OkHttp ([Http]); tests substitute canned replies. */
+interface HttpApi {
+    suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String
+    suspend fun postJson(url: String, body: String, headers: Map<String, String> = emptyMap()): String
+    suspend fun delete(url: String, headers: Map<String, String> = emptyMap()): String
+}
+
+object Http : HttpApi {
     /** Error bodies are kept for the provider to explain the failure, but never at full size. */
     private const val MAX_ERROR_BODY = 2_000
     /** Largest reply read into memory; an email with big attachments must not take the app down. */
@@ -23,16 +30,16 @@ object Http {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String =
+    override suspend fun get(url: String, headers: Map<String, String>): String =
         execute(Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build())
 
-    suspend fun postJson(url: String, body: String, headers: Map<String, String> = emptyMap()): String =
+    override suspend fun postJson(url: String, body: String, headers: Map<String, String>): String =
         execute(
             Request.Builder().url(url).post(body.toRequestBody(json))
                 .apply { headers.forEach { (k, v) -> header(k, v) } }.build()
         )
 
-    suspend fun delete(url: String, headers: Map<String, String> = emptyMap()): String =
+    override suspend fun delete(url: String, headers: Map<String, String>): String =
         execute(Request.Builder().url(url).delete().apply { headers.forEach { (k, v) -> header(k, v) } }.build())
 
     private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
