@@ -40,7 +40,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
         JSONTokener(http.get("$BASE?f=$f&lang=en$params")).nextValue().also { value ->
             val auth = (value as? JSONObject)?.optJSONObject("auth")
             if (auth != null && !auth.optBoolean("success", true)) {
-                throw ProviderException("Guerrilla Mail: ${auth.optJSONArray("error_codes")?.join(", ") ?: "auth error"}")
+                throw SessionException("Guerrilla Mail: ${auth.optJSONArray("error_codes")?.join(", ") ?: "auth error"}")
             }
         }
 
@@ -53,8 +53,23 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             json.optString("sid_token").takeIf { it.isNotBlank() }?.let { sids[name] = it }
         }
 
-    private suspend fun sid(inbox: Inbox): String =
-        sids[inbox.id] ?: attach(inbox.id).getString("sid_token")
+    /** The session was refused or answered for another inbox; a fresh attach may fix it. */
+    private class SessionException(message: String) : ProviderException(message)
+
+    /**
+     * Runs [block] with the session token (cached, else freshly attached); when the server rejects
+     * that session, it is dropped and [block] runs once more with a new one. That second failure
+     * is final.
+     */
+    private suspend fun <T> withSid(inbox: Inbox, block: suspend (String) -> T): T {
+        val first = sids[inbox.id] ?: attach(inbox.id).getString("sid_token")
+        try {
+            return block(first)
+        } catch (e: SessionException) {
+            sids.remove(inbox.id, first)
+        }
+        return block(attach(inbox.id).getString("sid_token"))
+    }
 
     override suspend fun createInbox(name: String?): Inbox {
         val n = sanitizeName(name) ?: randomName()
@@ -74,11 +89,10 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
         has("list") && optString("email").let { it.isBlank() || it.equals(inbox.address, ignoreCase = true) }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        var json = get("get_email_list", "&offset=0&sid_token=${sid(inbox)}")
-        if (!json.isListingOf(inbox)) {
-            val fresh = attach(inbox.id).getString("sid_token")
-            json = get("get_email_list", "&offset=0&sid_token=$fresh")
-            if (!json.isListingOf(inbox)) throw ProviderException("Guerrilla Mail did not return the inbox")
+        val json = withSid(inbox) { sid ->
+            get("get_email_list", "&offset=0&sid_token=${enc(sid)}").also {
+                if (!it.isListingOf(inbox)) throw SessionException("Guerrilla Mail did not return the inbox")
+            }
         }
         val arr = json.optJSONArray("list") ?: return emptyList()
         return (0 until arr.length()).map { i ->
@@ -94,12 +108,10 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
-        var m = call("fetch_email", "&email_id=${enc(summary.id)}&sid_token=${sid(inbox)}")
-        if (m !is JSONObject) {
-            // `false`: the message is gone, or the session was. Retry once with a fresh session to tell.
-            val fresh = attach(inbox.id).getString("sid_token")
-            m = call("fetch_email", "&email_id=${enc(summary.id)}&sid_token=$fresh")
-            if (m !is JSONObject) throw ProviderException("This message has expired (Guerrilla Mail keeps mail for one hour)")
+        // `false`: the message is gone, or the session was; a fresh session tells the two apart.
+        val m = withSid(inbox) { sid ->
+            call("fetch_email", "&email_id=${enc(summary.id)}&sid_token=${enc(sid)}") as? JSONObject
+                ?: throw SessionException("This message has expired (Guerrilla Mail keeps mail for one hour)")
         }
         val body = m.optString("mail_body").takeIf { it.isNotBlank() }
             ?: throw ProviderException("Empty message")
@@ -110,7 +122,8 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     override val canDeleteMessages get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        get("del_email", "&email_ids%5B%5D=${enc(summary.id)}&sid_token=${sid(inbox)}")
-        return true
+        val json = withSid(inbox) { sid -> get("del_email", "&email_ids%5B%5D=${enc(summary.id)}&sid_token=${enc(sid)}") }
+        val deleted = json.optJSONArray("deleted_ids") ?: return false
+        return (0 until deleted.length()).any { deleted.optString(it) == summary.id }
     }
 }

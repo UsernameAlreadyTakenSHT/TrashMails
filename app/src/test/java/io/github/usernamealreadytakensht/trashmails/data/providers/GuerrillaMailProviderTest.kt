@@ -87,3 +87,49 @@ class GuerrillaMailProviderTest {
         assertTrue(e.message!!.contains("auth.session_expired"))
     }
 }
+
+class GuerrillaMailSessionTest {
+    private val inbox = Inbox(
+        id = "trashmailsprobe", provider = Provider.GUERRILLA_MAIL,
+        address = "trashmailsprobe@guerrillamailblock.com", createdAt = 1_789_415_079_000L,
+    )
+    private val authFailure = body("""{"auth":{"success":false,"error_codes":["auth.session_expired"]}}""")
+
+    @Test
+    fun aRejectedCachedSessionIsDroppedAndAttachedAgain() = runBlocking {
+        val http = FakeHttp()
+            .on("f=set_email_user", fixture("guerrilla_set_email_user"))
+            .on("f=get_email_list", fixture("guerrilla_list"), authFailure, fixture("guerrilla_list"))
+        val provider = GuerrillaMailProvider(http)
+
+        provider.listMessages(inbox)
+        val second = provider.listMessages(inbox)
+
+        assertEquals(2, second.size)
+        assertEquals(
+            listOf("f=set_email_user", "f=get_email_list", "f=get_email_list", "f=set_email_user", "f=get_email_list"),
+            http.urls().map { url -> url.substringAfter("?").substringBefore("&") },
+        )
+    }
+
+    @Test
+    fun aRejectedFreshSessionIsFinal() = runBlocking {
+        val http = FakeHttp()
+            .on("f=set_email_user", fixture("guerrilla_set_email_user"))
+            .on("f=get_email_list", authFailure)
+        val e = assertThrows(ProviderException::class.java) { runBlocking { GuerrillaMailProvider(http).listMessages(inbox) } }
+        assertTrue(e.message!!.contains("auth.session_expired"))
+        // Attach, refused, attach again, refused again: no third try.
+        assertEquals(4, http.calls.size)
+    }
+
+    @Test
+    fun deleteMessage_reportsWhatTheServerDeleted() = runBlocking {
+        val http = FakeHttp()
+            .on("f=set_email_user", fixture("guerrilla_set_email_user"))
+            .on("f=del_email", body("""{"deleted_ids":["812345"],"auth":{"success":true,"error_codes":[]}}"""))
+        val provider = GuerrillaMailProvider(http)
+        assertTrue(provider.deleteMessage(inbox, MailSummary("812345", "", "", 0)))
+        assertTrue(!provider.deleteMessage(inbox, MailSummary("999", "", "", 0)))
+    }
+}
