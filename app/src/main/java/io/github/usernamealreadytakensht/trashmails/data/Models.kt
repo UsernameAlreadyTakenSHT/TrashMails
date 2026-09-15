@@ -41,7 +41,8 @@ data class Inbox(
     val createdAt: Long = System.currentTimeMillis(),
     val expiresAt: Long? = null,
 ) {
-    val key: String get() = "${provider.name}:$id"
+    /** Identity across providers (an id is only unique within one). Not part of equals: derived from it. */
+    val key: String = "${provider.name}:$id"
 }
 
 data class MailSummary(

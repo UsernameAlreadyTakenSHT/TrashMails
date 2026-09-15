@@ -260,7 +260,7 @@ private fun CreateInboxDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    providerGroups().forEach { (title, providers) ->
+                    PROVIDER_GROUPS.forEach { (title, providers) ->
                         Text(
                             title,
                             style = MaterialTheme.typography.labelMedium,
@@ -314,9 +314,8 @@ private fun CreateInboxDialog(
 }
 
 /** Providers grouped under a section title; inside a group the unavailable ones sink to the bottom. */
-private fun providerGroups(): List<Pair<String, List<Provider>>> {
-    val all = Provider.entries.sortedBy { !it.available }
-    return listOf(
+private val PROVIDER_GROUPS: List<Pair<String, List<Provider>>> = Provider.entries.sortedBy { !it.available }.let { all ->
+    listOf(
         "Open source" to all.filter { it.openSource },
         "Closed source" to all.filter { !it.openSource },
     ).filter { it.second.isNotEmpty() }

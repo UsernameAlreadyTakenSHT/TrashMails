@@ -27,13 +27,21 @@ fun Context.copyToClipboard(text: String, confirmation: String, sensitive: Boole
     }
 }
 
+// DateFormat instances are costly to build and not thread-safe: one set per thread, built once.
+private val dateFormats = ThreadLocal.withInitial {
+    Triple(
+        DateFormat.getDateInstance(DateFormat.SHORT),
+        DateFormat.getTimeInstance(DateFormat.SHORT),
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT),
+    )
+}
+
+/** Time only for today, date and time otherwise. */
 fun formatDate(millis: Long): String {
     if (millis <= 0) return ""
+    val (date, time, dateTime) = dateFormats.get()!!
     val d = Date(millis)
-    val sameDay = DateFormat.getDateInstance(DateFormat.SHORT).format(d) ==
-        DateFormat.getDateInstance(DateFormat.SHORT).format(Date())
-    return if (sameDay) DateFormat.getTimeInstance(DateFormat.SHORT).format(d)
-    else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(d)
+    return if (date.format(d) == date.format(Date())) time.format(d) else dateTime.format(d)
 }
 
 fun formatRemaining(expiresAt: Long?): String? {

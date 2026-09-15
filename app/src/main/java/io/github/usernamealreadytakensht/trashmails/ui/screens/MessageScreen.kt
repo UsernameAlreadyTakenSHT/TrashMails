@@ -192,9 +192,15 @@ fun MessageScreen(
 private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""")
 private const val URL_TRAIL = ".,;:!?)]}>'\""
 
+/** Beyond this many characters the plain body is cut, with a button to lay out the rest. */
+private const val PLAIN_BODY_PREVIEW = 200_000
+
 /** The plain body, with every http(s) address tappable through the same link policy as HTML. */
 @Composable
-private fun PlainBody(text: String, onLink: (Uri) -> Unit) {
+private fun PlainBody(fullText: String, onLink: (Uri) -> Unit) {
+    // A multi-megabyte text (an attachment inlined as text) would take seconds to lay out in one go.
+    var showAll by rememberSaveable(fullText.length) { mutableStateOf(fullText.length <= PLAIN_BODY_PREVIEW) }
+    val text = if (showAll) fullText else fullText.substring(0, PLAIN_BODY_PREVIEW)
     val linkStyle = TextLinkStyles(
         style = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline),
     )
@@ -211,12 +217,11 @@ private fun PlainBody(text: String, onLink: (Uri) -> Unit) {
             append(text, last, text.length)
         }
     }
-    SelectionContainer {
-        Text(
-            annotated,
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        SelectionContainer {
+            Text(annotated, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (!showAll) TextButton(onClick = { showAll = true }) { Text("Show all (${fullText.length / 1000} k characters)") }
     }
 }
 
