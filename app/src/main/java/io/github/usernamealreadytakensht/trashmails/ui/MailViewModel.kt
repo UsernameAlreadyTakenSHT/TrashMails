@@ -274,13 +274,22 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         content = null
     }
 
+    /** Deletes [summary] on the server; if it is the open message, the screen goes back to the list at once. */
     fun deleteMessage(inbox: Inbox, summary: MailSummary) {
+        if ((screen as? Screen.Message)?.summary?.id == summary.id) back()
         // Not tied to a screen: a deletion started should complete even if the user moves on.
         viewModelScope.launch {
             val deleted = attempt("Could not delete the message") { providerFor(inbox).deleteMessage(inbox, summary) }
-            if (deleted == true && currentInbox()?.key == inbox.key) {
-                messages = messages.filterNot { it.id == summary.id }
-                unread = unread + (inbox.key to countUnread(inbox, messages))
+            when {
+                deleted == null -> Unit
+                !deleted -> error = "${inbox.provider.label} did not delete the message"
+                else -> {
+                    if (currentInbox()?.key == inbox.key) {
+                        messages = messages.filterNot { it.id == summary.id }
+                        unread = unread + (inbox.key to countUnread(inbox, messages))
+                    }
+                    notice = "Message deleted"
+                }
             }
         }
     }

@@ -82,6 +82,7 @@ fun MessageScreen(
     var showHtml by rememberSaveable(summary.id) { mutableStateOf(settings.renderHtml) }
     var loadImages by rememberSaveable(summary.id) { mutableStateOf(settings.loadImages) }
     var menuOpen by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     /** A tapped link waiting for the user's go-ahead (as a string: Uri is not saveable). */
     var pendingLink by rememberSaveable { mutableStateOf<String?>(null) }
     val hasHtml = content?.html != null
@@ -105,8 +106,8 @@ fun MessageScreen(
                     if (body != null) IconButton(onClick = { context.copyToClipboard(body, "Message text copied", sensitive = true) }) {
                         Icon(CopyIcon, contentDescription = "Copy content")
                     }
-                    if (onDelete != null) IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    if (onDelete != null) IconButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete message")
                     }
                     // Always present so the buttons keep their place while the body loads.
                     IconButton(onClick = { menuOpen = true }) {
@@ -157,6 +158,14 @@ fun MessageScreen(
             }
         }
     }
+
+    if (confirmDelete && onDelete != null) AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("Delete this message?") },
+        text = { Text("It will be deleted on ${provider.label}; this cannot be undone.") },
+        confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+    )
 
     pendingLink?.let { link ->
         LinkDialog(
