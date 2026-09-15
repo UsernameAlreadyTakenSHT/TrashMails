@@ -41,6 +41,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -49,7 +50,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -148,10 +155,13 @@ fun MessageScreen(
                     }
                 }
                 showHtml && content.html != null -> {
-                    if (!loadImages) BlockedBanner(onLoad = { loadImages = true })
+                    if (!loadImages) BodyBanner("Remote images not loaded", "Load") { loadImages = true }
                     HtmlBody(content.html, loadImages, onLink)
                 }
-                !text.isNullOrBlank() -> PlainBody(text)
+                !text.isNullOrBlank() -> {
+                    if (hasHtml) BodyBanner("Shown as plain text", "View as HTML") { showHtml = true }
+                    PlainBody(text, onLink)
+                }
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -177,31 +187,52 @@ fun MessageScreen(
     }
 }
 
+/** Web addresses in a plain body; trailing punctuation is left out of the link. */
+private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""")
+private const val URL_TRAIL = ".,;:!?)]}>'\""
+
+/** The plain body, with every http(s) address tappable through the same link policy as HTML. */
 @Composable
-private fun PlainBody(text: String) {
+private fun PlainBody(text: String, onLink: (Uri) -> Unit) {
+    val linkStyle = TextLinkStyles(
+        style = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline),
+    )
+    val annotated = remember(text, linkStyle) {
+        buildAnnotatedString {
+            var last = 0
+            for (m in URL_IN_TEXT.findAll(text)) {
+                val url = m.value.trimEnd { it in URL_TRAIL }
+                if (url.length < 10) continue
+                append(text, last, m.range.first)
+                withLink(LinkAnnotation.Url(url, linkStyle) { onLink(Uri.parse(url)) }) { append(url) }
+                last = m.range.first + url.length
+            }
+            append(text, last, text.length)
+        }
+    }
     SelectionContainer {
         Text(
-            text,
+            annotated,
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
 
-/** Tells that the sender's images, styles and fonts were not fetched, with a way to fetch them. */
+/** One line above the body telling what is not shown, with the action that shows it. */
 @Composable
-private fun BlockedBanner(onLoad: () -> Unit) {
+private fun BodyBanner(text: String, action: String, onAction: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Remote images not loaded",
+            text,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onLoad) { Text("Load") }
+        TextButton(onClick = onAction) { Text(action) }
     }
     HorizontalDivider()
 }
