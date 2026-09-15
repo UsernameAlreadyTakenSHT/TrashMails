@@ -9,6 +9,8 @@ import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -57,11 +59,11 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
             val m = arr.getJSONObject(i)
             MailSummary(
                 id = m.getString("id"),
-                from = m.optString("from").ifBlank { m.optString("sender") },
-                subject = m.optString("subject"),
+                from = m.textOrEmpty("from").ifBlank { m.textOrEmpty("sender") },
+                subject = m.textOrEmpty("subject"),
                 date = m.optLong("received_at") * 1000,
-                html = m.optString("body_html").takeIf { it.isNotBlank() },
-                text = m.optString("body_plain").takeIf { it.isNotBlank() },
+                html = m.text("body_html"),
+                text = m.text("body_plain"),
             )
         }.sortedByDescending { it.date }
     }

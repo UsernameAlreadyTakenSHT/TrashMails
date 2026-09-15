@@ -12,6 +12,8 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -106,7 +108,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
             MailSummary(
                 id = m.getString("id"),
                 from = from?.optString("address").orEmpty().ifBlank { from?.optString("name").orEmpty() },
-                subject = m.optString("subject"),
+                subject = m.textOrEmpty("subject"),
                 date = parseDate(m.optString("createdAt")),
             )
         }.sortedByDescending { it.date }
@@ -120,7 +122,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
             is String -> h
             else -> ""
         }.takeIf { it.isNotBlank() }
-        return MailContent(html = html, text = m.optString("text").takeIf { it.isNotBlank() })
+        return MailContent(html = html, text = m.text("text"))
     }
 
     override val canDeleteMessages get() = true

@@ -12,6 +12,8 @@ import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Prefs
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.OffsetDateTime
@@ -83,11 +85,11 @@ class DropMailProvider(
             val id = m.optString("id").takeIf { it.isNotBlank() && it !in deleted } ?: return@mapNotNull null
             MailSummary(
                 id = id,
-                from = m.optString("headerFrom").takeIf { it.isNotBlank() } ?: m.optString("fromAddr"),
-                subject = m.optString("headerSubject"),
+                from = m.text("headerFrom") ?: m.textOrEmpty("fromAddr"),
+                subject = m.textOrEmpty("headerSubject"),
                 date = parseDate(m.optString("receivedAt")),
-                html = m.optString("html").takeIf { it.isNotBlank() },
-                text = m.optString("text").takeIf { it.isNotBlank() },
+                html = m.text("html"),
+                text = m.text("text"),
             )
         }
         val merged = (fresh + known).distinctBy { it.id }.sortedByDescending { it.date }
@@ -192,7 +194,7 @@ class DropMailProvider(
                 else "DropMail.me refused to hand out a token (HTTP ${e.code})"
             )
         }
-        val token = json.optString("token").takeIf { it.isNotBlank() } ?: throw ProviderException("DropMail.me sent no token")
+        val token = json.text("token") ?: throw ProviderException("DropMail.me sent no token")
         prefs.put(KEY_TOKEN to token, KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
         return token
     }

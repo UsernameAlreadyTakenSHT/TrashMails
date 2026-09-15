@@ -12,6 +12,8 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
 import java.time.Instant
 
@@ -49,8 +51,8 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
             val m = arr.getJSONObject(i)
             MailSummary(
                 id = m.getString("id"),
-                from = m.optString("headerfrom").ifBlank { m.optString("mailfrom") }.replace(WHITESPACE, " "),
-                subject = m.optString("subject").replace(WHITESPACE, " "),
+                from = m.textOrEmpty("headerfrom").ifBlank { m.textOrEmpty("mailfrom") }.replace(WHITESPACE, " "),
+                subject = m.textOrEmpty("subject").replace(WHITESPACE, " "),
                 date = parseDate(m.optString("date")),
             )
         }.sortedByDescending { it.date }
@@ -62,10 +64,10 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
             mapOf("m" to inbox.id, "id" to summary.id),
         )
         val m = data.optJSONObject("message") ?: throw ProviderException("Message not found")
-        val html = m.optString("html").takeIf { it.isNotBlank() }
+        val html = m.text("html")
         if (html != null) return MailContent(html = html, text = null)
         // No HTML: `data` is the raw RFC 822 message (headers + body), read for its text or HTML part.
-        val raw = m.optString("data").takeIf { it.isNotBlank() } ?: return MailContent(null, null)
+        val raw = m.text("data") ?: return MailContent(null, null)
         val parts = MimeText.parse(raw)
         return MailContent(html = parts.html, text = parts.text)
     }

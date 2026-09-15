@@ -35,11 +35,11 @@ class MessageCache(private val prefs: Prefs) {
 
     private fun fromJson(o: JSONObject) = MailSummary(
         id = o.getString("id"),
-        from = o.optString("from"),
-        subject = o.optString("subject"),
+        from = o.textOrEmpty("from"),
+        subject = o.textOrEmpty("subject"),
         date = o.optLong("date"),
-        html = o.optString("html").takeIf { it.isNotEmpty() },
-        text = o.optString("text").takeIf { it.isNotEmpty() },
+        html = o.text("html"),
+        text = o.text("text"),
     )
 
     private companion object {

@@ -12,6 +12,8 @@ import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -39,7 +41,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
             throw ProviderException(explain(e.body) ?: "tempmail.lol refused to create the address (HTTP ${e.code})")
         }
         if (json.optBoolean("captcha_required")) throw ProviderException("tempmail.lol asks for a captcha right now: try again later")
-        json.optString("error").takeIf { it.isNotBlank() }?.let { throw ProviderException("tempmail.lol: $it") }
+        json.text("error")?.let { throw ProviderException("tempmail.lol: $it") }
         val now = System.currentTimeMillis()
         return Inbox(
             id = json.getString("address"),
@@ -60,11 +62,11 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
         if (arr == null || arr.length() == 0) return known
         val fresh = (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)
-            val from = m.optString("from")
-            val subject = m.optString("subject")
+            val from = m.textOrEmpty("from")
+            val subject = m.textOrEmpty("subject")
             val date = m.optLong("date").takeIf { it > 0 } ?: System.currentTimeMillis()
-            val text = m.optString("body").takeIf { it.isNotBlank() }
-            val html = m.optString("html").takeIf { it.isNotBlank() }
+            val text = m.text("body")
+            val html = m.text("html")
             MailSummary(
                 // The API gives no id: one is derived from what the message is, stable across fetches.
                 id = "$date-${(from + subject + (text ?: html.orEmpty())).hashCode().toUInt().toString(16)}",

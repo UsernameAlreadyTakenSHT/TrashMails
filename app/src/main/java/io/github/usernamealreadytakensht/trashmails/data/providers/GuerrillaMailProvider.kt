@@ -11,6 +11,8 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.text
+import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.net.URLEncoder
@@ -51,7 +53,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     /** Attaches a new session to [name], caches and returns its token. */
     private suspend fun attach(name: String): JSONObject =
         get("set_email_user", "&email_user=${enc(name)}").also { json ->
-            json.optString("sid_token").takeIf { it.isNotBlank() }?.let { sids[name] = it }
+            json.text("sid_token")?.let { sids[name] = it }
         }
 
     /** The session was refused or answered for another inbox; a fresh attach may fix it. */
@@ -111,8 +113,8 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             val m = arr.getJSONObject(i)
             MailSummary(
                 id = m.optString("mail_id"),
-                from = m.optString("mail_from"),
-                subject = m.optString("mail_subject"),
+                from = m.textOrEmpty("mail_from"),
+                subject = m.textOrEmpty("mail_subject"),
                 // The welcome mail has no timestamp: date it at the inbox creation, not "now" on every poll.
                 date = m.optLong("mail_timestamp").takeIf { it > 0 }?.let { it * 1000 } ?: inbox.createdAt,
             )
@@ -125,7 +127,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             call("fetch_email", "&email_id=${enc(summary.id)}&sid_token=${enc(sid)}") as? JSONObject
                 ?: throw SessionException("This message has expired (Guerrilla Mail keeps mail for one hour)")
         }
-        val body = m.optString("mail_body").takeIf { it.isNotBlank() }
+        val body = m.text("mail_body")
             ?: throw ProviderException("Empty message")
         // Guerrilla returns the body as HTML, plain-text mails included (wrapped in <pre>/<p>).
         return MailContent(html = body, text = null)
