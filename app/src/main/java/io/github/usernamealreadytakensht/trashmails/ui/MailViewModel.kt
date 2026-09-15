@@ -258,7 +258,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         messageLoading = true
         messageJob = viewModelScope.launch {
-            content = attempt("Could not load the message") { providerFor(inbox).getMessage(inbox, summary) }
+            content = attempt("Could not load the message") {
+                // The plain text is derived here, once and off the main thread, when the provider has none.
+                val c = providerFor(inbox).getMessage(inbox, summary)
+                if (c.text == null && c.html != null) c.copy(text = htmlToText(c.html)) else c
+            }
             messageLoading = false
         }
     }

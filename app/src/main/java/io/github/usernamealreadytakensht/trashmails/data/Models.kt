@@ -54,6 +54,7 @@ data class MailSummary(
     val ref: Map<String, String> = emptyMap(),
 )
 
+/** A message body. [text] is the provider's plain part, or one derived from [html] by the ViewModel. */
 data class MailContent(val html: String?, val text: String?)
 
 interface MailProvider {

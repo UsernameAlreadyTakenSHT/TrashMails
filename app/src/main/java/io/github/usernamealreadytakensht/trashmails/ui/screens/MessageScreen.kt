@@ -60,7 +60,6 @@ import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.ui.CopyIcon
 import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDate
-import io.github.usernamealreadytakensht.trashmails.ui.htmlToText
 import java.io.ByteArrayInputStream
 
 /**
@@ -102,7 +101,7 @@ fun MessageScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
-                    val body = content?.text ?: content?.html?.let(::htmlToText)
+                    val body = content?.text
                     if (body != null) IconButton(onClick = { context.copyToClipboard(body, "Message text copied", sensitive = true) }) {
                         Icon(CopyIcon, contentDescription = "Copy content")
                     }
@@ -138,7 +137,7 @@ fun MessageScreen(
                 )
             }
             HorizontalDivider()
-            val text = content?.text ?: content?.html?.let(::htmlToText)
+            val text = content?.text
             when {
                 content == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     when {
