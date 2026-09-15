@@ -51,7 +51,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
             http.postJson("$BASE/token", credentials(inbox))
         } catch (e: HttpException) {
             // Rejected credentials: the account was deleted (by mail.tm after inactivity, or elsewhere).
-            if (e.code == 401) throw ProviderException("This mail.tm account no longer exists: remove the address")
+            if (e.code == 401) throw AccountGoneException()
             throw e
         }
         val token = JSONObject(reply).getString("token")
@@ -127,12 +127,26 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
 
     override val canDeleteInbox get() = true
 
-    /** Deletes the account itself: every message goes with it and the address is freed. */
+    /**
+     * Deletes the account itself: every message goes with it and the address is freed. An account
+     * already gone (purged by mail.tm, or deleted elsewhere) counts as deleted, so the address can
+     * still be removed from the app.
+     */
     override suspend fun deleteInbox(inbox: Inbox): Boolean {
-        authed(inbox) { h -> http.delete("$BASE/accounts/${inbox.id}", h) }
+        try {
+            authed(inbox) { h -> http.delete("$BASE/accounts/${inbox.id}", h) }
+        } catch (e: AccountGoneException) {
+            // Nothing left to delete.
+        } catch (e: HttpException) {
+            if (e.code != 404) throw e
+        }
         jwts.remove(inbox.id)
         return true
     }
+
+    /** The credentials are refused: mail.tm removed the account (after inactivity) or it was deleted elsewhere. */
+    private class AccountGoneException :
+        ProviderException("This mail.tm account no longer exists: remove the address")
 
     /**
      * The reason of a 422, from the API Platform error body: the violation messages when there

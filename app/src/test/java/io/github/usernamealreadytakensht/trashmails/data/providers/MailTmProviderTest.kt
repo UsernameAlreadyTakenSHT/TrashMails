@@ -100,3 +100,19 @@ class MailTmProviderTest {
         assertEquals(listOf("https://api.mail.tm/accounts/6aa87175a29c4e703e015c72"), http.urls("DELETE"))
     }
 }
+
+class MailTmDeletedAccountTest {
+    private val inbox = Inbox(id = "gone", provider = Provider.MAIL_TM, address = "gone@uberip.com", token = "pw")
+
+    @Test
+    fun deleteInbox_succeedsWhenTheAccountIsAlreadyGone() = runBlocking {
+        val http = FakeHttp().on("/token", error(401, """{"code":401,"message":"Invalid credentials."}"""))
+        assertTrue(MailTmProvider(http).deleteInbox(inbox))
+    }
+
+    @Test
+    fun deleteInbox_succeedsOn404() = runBlocking {
+        val http = FakeHttp().on("/token", fixture("mailtm_token")).on("/accounts/gone", error(404))
+        assertTrue(MailTmProvider(http).deleteInbox(inbox))
+    }
+}
