@@ -41,7 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +66,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.sp
 import io.github.usernamealreadytakensht.trashmails.data.CreationQuota
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
@@ -105,15 +105,17 @@ fun HomeScreen(
     val host = rememberMessageHost(error?.takeIf { !showDialog }, notice, onDismissError, onDismissNotice)
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("TrashMails") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("TrashMails") },
+                actions = {
+                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+                },
+            )
+        },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SmallFloatingActionButton(onClick = onOpenSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings")
-                }
-                FloatingActionButton(onClick = { onOpenCreate(); showDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "New address")
-                }
+            FloatingActionButton(onClick = { onOpenCreate(); showDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "New address")
             }
         },
         snackbarHost = { SnackbarHost(host) },
@@ -234,6 +236,9 @@ private fun CreateInboxDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        // While the address is being created only the Cancel button dismisses: a stray tap outside
+        // must not silently abandon (and possibly orphan) a creation in progress.
+        properties = DialogProperties(dismissOnClickOutside = !creating, dismissOnBackPress = !creating),
         title = { Text("New address") },
         text = {
             Column(
