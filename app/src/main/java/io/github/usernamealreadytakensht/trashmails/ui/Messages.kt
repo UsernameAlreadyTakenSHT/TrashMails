@@ -27,7 +27,7 @@ fun Throwable.userMessage(fallback: String): String = when (this) {
 private fun String.forDisplay(): String? =
     replace(CONTROL_CHARS, " ").trim().take(MAX_MESSAGE_LENGTH).takeIf { it.isNotEmpty() }
 
-private val CONTROL_CHARS = Regex("""[p{Cntrl}s]+""")
+private val CONTROL_CHARS = Regex("""[\p{Cntrl}\s]+""")
 private const val MAX_MESSAGE_LENGTH = 200
 
 /**
