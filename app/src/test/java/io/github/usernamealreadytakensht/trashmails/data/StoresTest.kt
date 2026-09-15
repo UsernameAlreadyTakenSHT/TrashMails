@@ -13,6 +13,7 @@ class MemoryPrefs : Prefs {
     override fun getInt(key: String, default: Int): Int = map[key] as? Int ?: default
     override fun getBoolean(key: String, default: Boolean): Boolean = map[key] as? Boolean ?: default
     override fun put(vararg entries: Pair<String, Any>) { entries.forEach { (k, v) -> map[k] = v } }
+    override fun remove(vararg keys: String) { keys.forEach { map.remove(it) } }
 }
 
 class InboxStoreTest {

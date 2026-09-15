@@ -188,7 +188,7 @@ class DropMailProviderTest {
 
         p.forgetInbox(inbox)
         assertTrue(cache.load(inbox.key).isEmpty())
-        assertEquals("", prefs.getString("session:${inbox.key}"))
+        assertNull(prefs.getString("session:${inbox.key}"))
     }
 }
 

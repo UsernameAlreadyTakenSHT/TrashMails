@@ -121,7 +121,7 @@ class DropMailProvider(
 
     override fun forgetInbox(inbox: Inbox) {
         cache.clear(inbox.key)
-        prefs.put(sessionKey(inbox) to "", deletedKey(inbox) to "")
+        prefs.remove(sessionKey(inbox), deletedKey(inbox))
     }
 
     /**

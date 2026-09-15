@@ -37,7 +37,7 @@ class MessageCache(private val prefs: Prefs) {
 
     private val lock = Any()
 
-    fun clear(inboxKey: String) = prefs.put(inboxKey to "")
+    fun clear(inboxKey: String) = prefs.remove(inboxKey)
 
     private fun toJson(m: MailSummary) = JSONObject()
         .put("id", m.id)

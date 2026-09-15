@@ -9,6 +9,8 @@ interface Prefs {
     fun getBoolean(key: String, default: Boolean): Boolean
     /** Writes every entry (String, Int or Boolean values) in one edit. */
     fun put(vararg entries: Pair<String, Any>)
+    /** Drops the entries, so a forgotten inbox leaves no key behind. */
+    fun remove(vararg keys: String)
 }
 
 /** [Prefs] over a private SharedPreferences file. */
@@ -29,6 +31,12 @@ class SharedPrefs(context: Context, name: String) : Prefs {
                 else -> throw IllegalArgumentException("Unsupported preference type for $key")
             }
         }
+        edit.apply()
+    }
+
+    override fun remove(vararg keys: String) {
+        val edit = prefs.edit()
+        keys.forEach { edit.remove(it) }
         edit.apply()
     }
 }
