@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import io.github.usernamealreadytakensht.trashmails.data.CreationQuota
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
@@ -28,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 sealed interface Screen {
     data object Home : Screen
@@ -41,7 +43,7 @@ sealed interface Screen {
  * polling loop, one message body); leaving that screen cancels the job, so a slow reply can
  * never land on a different screen. Cancellation is never reported as an error.
  */
-class MailViewModel(app: Application) : AndroidViewModel(app) {
+class MailViewModel(app: Application, private val savedState: SavedStateHandle) : AndroidViewModel(app) {
     private val store = InboxStore(app)
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
@@ -54,8 +56,15 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var settings by mutableStateOf(settingsStore.load())
         private set
-    var screen: Screen by mutableStateOf(Screen.Home)
-        private set
+    private var screenState by mutableStateOf<Screen>(Screen.Home)
+    val screen: Screen get() = screenState
+
+    /** Moves to [s] and records where we are, so the screen comes back after the process is killed. */
+    private fun setScreen(s: Screen) {
+        screenState = s
+        savedState[SAVED_INBOX] = (s as? Screen.InboxDetail)?.inbox?.key ?: (s as? Screen.Message)?.inbox?.key
+        savedState[SAVED_MESSAGE] = (s as? Screen.Message)?.summary?.let(::summaryToJson)
+    }
 
     var messages by mutableStateOf<List<MailSummary>>(emptyList())
         private set
@@ -171,7 +180,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openSettings() {
-        screen = Screen.Settings
+        setScreen(Screen.Settings)
     }
 
     fun updateSettings(s: Settings) {
@@ -267,7 +276,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openInbox(inbox: Inbox) {
-        screen = Screen.InboxDetail(inbox)
+        setScreen(Screen.InboxDetail(inbox))
         messages = emptyList()
         listLoaded = false
         listProblem = null
@@ -280,7 +289,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private fun countUnread(inbox: Inbox, list: List<MailSummary>) = list.count { !isRead(inbox, it) }
 
     fun openMessage(inbox: Inbox, summary: MailSummary) {
-        screen = Screen.Message(inbox, summary)
+        setScreen(Screen.Message(inbox, summary))
         if (!isRead(inbox, summary)) {
             read = read + (inbox.key to read[inbox.key].orEmpty() + summary.id)
             setUnread(inbox, messages)
@@ -337,9 +346,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         notice = null
         when (val s = screen) {
-            is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox) }
-            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList(); listProblem = null }
-            Screen.Settings -> screen = Screen.Home
+            is Screen.Message -> { cancelMessage(); setScreen(Screen.InboxDetail(s.inbox)) }
+            is Screen.InboxDetail -> { stopPolling(); setScreen(Screen.Home); messages = emptyList(); listProblem = null }
+            Screen.Settings -> setScreen(Screen.Home)
             Screen.Home -> Unit
         }
     }
@@ -422,7 +431,32 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearNotice(shown: String) { if (notice == shown) notice = null }
 
+    init {
+        // After a process death, land where the user was (the inbox is re-listed, the message re-fetched).
+        val inbox = savedState.get<String>(SAVED_INBOX)?.let { key -> inboxes.firstOrNull { it.key == key } }
+        if (inbox != null) {
+            openInbox(inbox)
+            savedState.get<String>(SAVED_MESSAGE)?.let(::summaryFromJson)?.let { openMessage(inbox, it) }
+        }
+    }
+
+    private fun summaryToJson(s: MailSummary): String = JSONObject()
+        .put("id", s.id).put("from", s.from).put("subject", s.subject).put("date", s.date)
+        .put("ref", JSONObject(s.ref))
+        .toString()
+
+    private fun summaryFromJson(json: String): MailSummary? = runCatching {
+        val o = JSONObject(json)
+        val ref = o.optJSONObject("ref")
+        MailSummary(
+            id = o.getString("id"), from = o.optString("from"), subject = o.optString("subject"), date = o.optLong("date"),
+            ref = ref?.keys()?.asSequence()?.associateWith { ref.optString(it) }.orEmpty(),
+        )
+    }.getOrNull()
+
     private companion object {
         const val MANUAL_REFRESH_MIN_MS = 30_000L
+        const val SAVED_INBOX = "screen.inbox"
+        const val SAVED_MESSAGE = "screen.message"
     }
 }
