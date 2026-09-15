@@ -83,6 +83,7 @@ fun MessageScreen(
     loading: Boolean,
     error: String?,
     settings: Settings,
+    deletesLocally: Boolean,
     onBack: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
@@ -173,7 +174,12 @@ fun MessageScreen(
     if (confirmDelete && onDelete != null) AlertDialog(
         onDismissRequest = { confirmDelete = false },
         title = { Text("Delete this message?") },
-        text = { Text("It will be deleted on ${provider.label}; this cannot be undone.") },
+        text = {
+            Text(
+                if (deletesLocally) "${provider.label} keeps no copy: the message will be gone from this app for good."
+                else "It will be deleted on ${provider.label}; this cannot be undone."
+            )
+        },
         confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
     )

@@ -14,6 +14,7 @@ import io.github.usernamealreadytakensht.trashmails.data.InboxStore
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
+import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ReadStore
 import io.github.usernamealreadytakensht.trashmails.data.Settings
@@ -45,7 +46,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
     private val readStore = ReadStore(app)
-    private val providers: Map<Provider, MailProvider> = allProviders()
+    private val providers: Map<Provider, MailProvider> = allProviders(cache = MessageCache(app))
 
     var inboxes by mutableStateOf(store.load())
         private set
@@ -134,6 +135,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private fun providerFor(inbox: Inbox) = providers.getValue(inbox.provider)
 
     fun canDeleteMessages(inbox: Inbox) = providerFor(inbox).canDeleteMessages
+    fun deletesLocally(inbox: Inbox) = providerFor(inbox).deletesLocally
 
     /** One line for the inbox empty state: how the list gets refreshed. */
     val refreshHint: String
@@ -276,6 +278,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     }
 
     private fun forget(inbox: Inbox) {
+        providerFor(inbox).forgetInbox(inbox)
         inboxes = inboxes.filterNot { it.key == inbox.key }
         lastFetch.remove(inbox.key)
         unread = unread - inbox.key

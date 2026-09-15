@@ -57,6 +57,18 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         ),
         warning = null,
     )
+    Provider.TEMPMAIL_LOL -> RetentionInfo(
+        mails = listOf(
+            "Handed over once: the server drops an email as soon as this app fetches it, so the copy kept here is the only one.",
+            "Deleting a message only removes that local copy.",
+        ),
+        account = listOf(
+            "The address lives one hour on the server, then stops receiving.",
+            "Removing it forgets the address and its messages in this app; nothing remains on the server.",
+            "When creating: the name is a prefix (a random suffix is added) and the random subdomain can be left out.",
+        ),
+        warning = null,
+    )
     Provider.MAILDROP -> RetentionInfo(
         mails = listOf(
             "Kept on the server: 10 messages max (oldest are overwritten).",

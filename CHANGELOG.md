@@ -2,9 +2,10 @@
 
 ### Added
 - **Guerrilla Mail: the domain and a scrambled address can be chosen when creating** — tap the domain at the end of the name field to pick one of the eleven (they all reach the same inbox; a lesser-known one gets past sites that refuse guerrillamail.com) and, optionally, a scrambled address: a random alias of the inbox handed out instead of its name, which anyone could otherwise open. Nothing is remembered: every creation starts from guerrillamail.com, unscrambled.
+- **tempmail.lol.** A private inbox behind a token, alive one hour, on a random domain. The name typed is a prefix the service completes; a checkbox leaves out the random subdomain. The service hands each email over once and keeps nothing, so the app stores what it fetched (bodies included) and deleting a message only drops that local copy.
 
 ### Changed
-- **The create dialog keeps one height whatever the provider** (its options sit inline: the domain at the end of the name field, checkboxes below), so nothing jumps or scrolls when switching providers.
+- **The create dialog keeps one height whatever the provider** and shows the provider's options inline (domain at the end of the name field, checkboxes below) instead of a folded "Advanced" section, so nothing jumps or scrolls when switching providers.
 
 ## v0.4.0 — 2026-09-15
 

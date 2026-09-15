@@ -128,6 +128,7 @@ private fun App(vm: MailViewModel) {
             loading = vm.messageLoading,
             error = vm.error,
             settings = vm.settings,
+            deletesLocally = vm.deletesLocally(s.inbox),
             onBack = vm::back,
             onDelete = if (vm.canDeleteMessages(s.inbox)) {
                 { vm.deleteMessage(s.inbox, s.summary) }

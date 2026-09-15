@@ -1,0 +1,1 @@
+{"emails":[{"from":"alice@example.com","to":"trashmailsprobe90a610@imagesthere.com","subject":"First","body":"Hello there","html":"<p>Hello <b>there</b></p>","date":1789415200000,"ip":"203.0.113.9"},{"from":"bob@example.com","to":"trashmailsprobe90a610@imagesthere.com","subject":"Second","body":"Plain only","html":null,"date":1789415300000,"ip":"203.0.113.10"}],"expired":false}

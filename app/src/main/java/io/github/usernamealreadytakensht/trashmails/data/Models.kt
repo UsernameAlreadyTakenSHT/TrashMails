@@ -16,6 +16,10 @@ enum class Provider(
     val domains: List<String> = emptyList(),
     /** The service can hand out a scrambled alias of the inbox name, harder to guess than the name. */
     val scrambleAvailable: Boolean = false,
+    /** The name typed is only a prefix: the service appends a random suffix (and picks the domain). */
+    val nameIsPrefix: Boolean = false,
+    /** Addresses normally sit on a random subdomain; the user may ask for the bare domain instead. */
+    val subdomainOptional: Boolean = false,
 ) {
     // Declaration order is the display order within a group (open source first, unavailable last).
     INBOX_KITTEN("Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten"),
@@ -31,6 +35,12 @@ enum class Provider(
         scrambleAvailable = true,
     ),
     MAIL_TM("mail.tm", "domain chosen by mail.tm", true, 10, "https://mail.tm", "https://mail.tm/en/privacy/"),
+    // Only the clients are open source (github.com/tempmail-lol); the service itself is not.
+    TEMPMAIL_LOL(
+        "tempmail.lol", "random domain", true, 20, "https://tempmail.lol", "https://tempmail.lol/privacy",
+        nameIsPrefix = true,
+        subdomainOptional = true,
+    ),
     BURNER_KIWI(
         "Burner Kiwi", "random address", false, 5, "https://burner.kiwi",
         sourceUrl = "https://github.com/haydenwoodhead/burner.kiwi",
@@ -53,9 +63,9 @@ enum class Provider(
  * Choices offered when creating an address, for the providers that support them
  * ([Provider.domains], [Provider.scrambleAvailable]); ignored by the others.
  */
-data class CreateOptions(val domain: String? = null, val scramble: Boolean = false)
+data class CreateOptions(val domain: String? = null, val scramble: Boolean = false, val noSubdomain: Boolean = false)
 
-/** A temporary inbox. [id] is the mailbox name (kitten/guerrilla/maildrop) or the account id (burner/mail.tm). */
+/** A temporary inbox. [id] is the mailbox name (kitten/guerrilla/maildrop), the account id (burner/mail.tm) or the address (tempmail.lol). */
 data class Inbox(
     val id: String,
     val provider: Provider,
@@ -95,6 +105,12 @@ interface MailProvider {
     /** Whether [deleteInbox] removes the inbox on the server (an account), not only from this app. */
     val canDeleteInbox: Boolean get() = false
     suspend fun deleteInbox(inbox: Inbox): Boolean = false
+
+    /** True when [deleteMessage] only drops a local copy: the server hands messages over once and keeps none. */
+    val deletesLocally: Boolean get() = false
+
+    /** The app forgets [inbox]: anything the provider kept for it locally goes too. */
+    fun forgetInbox(inbox: Inbox) {}
 }
 
 open class ProviderException(message: String, cause: Throwable? = null) : Exception(message, cause)
