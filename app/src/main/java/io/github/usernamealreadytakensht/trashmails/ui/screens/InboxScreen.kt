@@ -87,9 +87,9 @@ fun InboxScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         when {
-                            loaded -> "Inbox is empty.\nAuto-refresh every minute."
+                            loaded -> "Inbox is empty.\n$refreshHint"
                             loading -> "Loading…"
-                            else -> "Could not load the inbox.\nAuto-refresh every minute."
+                            else -> "Could not load the inbox.\n$refreshHint"
                         },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
