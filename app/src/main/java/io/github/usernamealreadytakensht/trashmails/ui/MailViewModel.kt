@@ -105,6 +105,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Last successful listing, for the manual-refresh throttle. */
     private var lastFetchKey: String? = null
     private var lastFetchAt = 0L
+    /** Message ids deleted (or being deleted) per inbox key, filtered out of listings until the server agrees. */
+    private val pendingDeletes = mutableMapOf<String, MutableSet<String>>()
     /** The error the polling loop itself last reported, so a recovery only clears that one. */
     private var lastFetchError: String? = null
     /** Why the last listing of the open inbox failed, or null; shown inline under the list. */
@@ -248,6 +250,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val deleted = attempt("Could not delete the account on ${inbox.provider.label}") { providerFor(inbox).deleteInbox(inbox) }
             if (deleted == true) {
+                // The user may have opened the inbox meanwhile: leave it before it disappears.
+                while (currentInbox()?.key == inbox.key) back()
                 forget(inbox)
                 notice = "Account deleted on ${inbox.provider.label}"
             }
@@ -305,9 +309,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes [summary] on the server; if it is the open message, the screen goes back to the list at once. */
     fun deleteMessage(inbox: Inbox, summary: MailSummary) {
         if ((screen as? Screen.Message)?.summary?.id == summary.id) back()
+        // Hidden from listings from now on, so a poll already in flight cannot bring it back.
+        pendingDeletes.getOrPut(inbox.key) { mutableSetOf() }.add(summary.id)
         // Not tied to a screen: a deletion started should complete even if the user moves on.
         viewModelScope.launch {
             val deleted = attempt("Could not delete the message") { providerFor(inbox).deleteMessage(inbox, summary) }
+            if (deleted != true) pendingDeletes[inbox.key]?.remove(summary.id)
             when {
                 deleted == null -> Unit
                 !deleted -> error = "${inbox.provider.label} did not delete the message"
@@ -315,6 +322,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     if (currentInbox()?.key == inbox.key) {
                         messages = messages.filterNot { it.id == summary.id }
                         setUnread(inbox, messages)
+                    } else if (!isRead(inbox, summary)) {
+                        // Not listed any more: the badge counts one unread fewer.
+                        unread = unread + (inbox.key to ((unread[inbox.key] ?: 1) - 1).coerceAtLeast(0))
+                        saveRead()
                     }
                     notice = "Message deleted"
                 }
@@ -357,10 +368,14 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             if (manual) { error = msg; lastFetchError = msg }
         }) { providerFor(inbox).listMessages(inbox) }
         if (list != null) {
+            val hidden = pendingDeletes[inbox.key]
+            val shown = if (hidden.isNullOrEmpty()) list else list.filterNot { it.id in hidden }
+            // Once the server no longer lists a deleted id, it needs no hiding.
+            hidden?.retainAll { id -> list.any { it.id == id } }
             lastFetchKey = inbox.key
             lastFetchAt = System.currentTimeMillis()
-            messages = list
-            setUnread(inbox, list)
+            messages = shown
+            setUnread(inbox, shown)
             listLoaded = true
             listProblem = null
             // A listing that works again clears the listing error it had set — not somebody else's
