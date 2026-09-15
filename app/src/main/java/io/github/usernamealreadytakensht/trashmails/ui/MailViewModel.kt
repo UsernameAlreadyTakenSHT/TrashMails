@@ -47,7 +47,9 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
     private val readStore = ReadStore(app)
-    private val providers: Map<Provider, MailProvider> = allProviders(cache = MessageCache(app), prefsFor = { SharedPrefs(app, it) })
+    /** What the cache-backed providers keep locally: shown when their listing cannot be refreshed. */
+    private val cache = MessageCache(app)
+    private val providers: Map<Provider, MailProvider> = allProviders(cache = cache, prefsFor = { SharedPrefs(app, it) })
 
     var inboxes by mutableStateOf(store.load())
         private set
@@ -398,6 +400,11 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             listProblem = msg
             if (manual) { error = msg; lastFetchError = msg }
         }) { providerFor(inbox).listMessages(inbox) }
+        if (list == null && !listLoaded && messages.isEmpty()) {
+            // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
+            val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }
+            if (kept.isNotEmpty()) { messages = kept; listLoaded = true }
+        }
         if (list != null) {
             val hidden = pendingDeletes[inbox.key]
             val shown = if (hidden.isNullOrEmpty()) list else list.filterNot { it.id in hidden }
