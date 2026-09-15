@@ -1,4 +1,6 @@
-## Unreleased
+## v0.5.0 — 2026-09-15
+
+Two more providers and the creation options that came with them.
 
 ### Added
 - **Guerrilla Mail: the domain and a scrambled address can be chosen when creating** — tap the domain at the end of the name field to pick one of the eleven (they all reach the same inbox; a lesser-known one gets past sites that refuse guerrillamail.com) and, optionally, a scrambled address: a random alias of the inbox handed out instead of its name, which anyone could otherwise open. Nothing is remembered: every creation starts from guerrillamail.com, unscrambled.
@@ -6,7 +8,7 @@
 - **DropMail.me.** A random address on one of fifteen permanent domains (random by default, or picked from the Domain field). The address lives in a 10-minute session that every refresh extends; once it has lapsed, the app restores the same address into a new session at the next refresh with its restore key (mail sent while it has lapsed bounces). Mail goes with the session and cannot be deleted on the server, so the app keeps what it fetched and deleting a message drops that local copy. The @ button on the inbox makes an extended address (`name-tag@sub.domain`, delivered to the same inbox) to hand to a site that refuses the plain one. The API needs a free token, which the app requests for the device (renewed daily).
 
 ### Changed
-- **The create dialog keeps one height whatever the provider** and shows the provider's options inline (domain at the end of the name field, checkboxes below) instead of a folded "Advanced" section, so nothing jumps or scrolls when switching providers.
+- **The create dialog keeps one height whatever the provider** (its options sit inline: the domain at the end of the name field, checkboxes below), so nothing jumps or scrolls when switching providers.
 
 ## v0.4.0 — 2026-09-15
 
