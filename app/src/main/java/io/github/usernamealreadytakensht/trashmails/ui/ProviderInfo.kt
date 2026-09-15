@@ -95,3 +95,9 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
     )
 }
+
+/** What deleting a message means for a provider that only drops the local copy (the delete dialog). */
+fun localDeleteNote(provider: Provider): String = when (provider) {
+    Provider.DROPMAIL -> "Removed from this app and hidden; DropMail.me keeps it until the session ends."
+    else -> "${provider.label} keeps no copy: the message will be gone from this app for good."
+}

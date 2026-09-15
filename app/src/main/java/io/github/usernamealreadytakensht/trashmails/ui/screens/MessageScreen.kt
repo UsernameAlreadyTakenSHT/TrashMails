@@ -67,6 +67,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.ui.CopyIcon
 import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDate
+import io.github.usernamealreadytakensht.trashmails.ui.localDeleteNote
 import java.io.ByteArrayInputStream
 import java.net.IDN
 
@@ -176,7 +177,7 @@ fun MessageScreen(
         title = { Text("Delete this message?") },
         text = {
             Text(
-                if (deletesLocally) "${provider.label} keeps no copy: the message will be gone from this app for good."
+                if (deletesLocally) localDeleteNote(provider)
                 else "It will be deleted on ${provider.label}; this cannot be undone."
             )
         },
