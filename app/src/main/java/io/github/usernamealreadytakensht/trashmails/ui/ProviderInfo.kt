@@ -78,6 +78,7 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
             "The address lives in a session that ends 10 minutes after its last access: every refresh extends it, and once it has lapsed the app restores the same address into a new session at the next refresh. Mail sent while it has lapsed bounces.",
             "Removing the address forgets it and its messages in this app; DropMail keeps nothing that can be opened again.",
             "When creating: the domain (random among the permanent ones unless chosen). The name is always the server's.",
+            "Extended addresses (the @ button on the inbox): name-tag@sub.domain reaches the same inbox, for a site that refuses the plain address.",
         ),
         warning = null,
     )

@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,17 +16,24 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
+import io.github.usernamealreadytakensht.trashmails.ui.AlternateEmailIcon
 import io.github.usernamealreadytakensht.trashmails.ui.CopyIcon
 import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDate
@@ -63,6 +72,8 @@ fun InboxScreen(
 ) {
     val context = LocalContext.current
     val host = rememberMessageHost(error, notice, onDismissError, onDismissNotice)
+    var extending by rememberSaveable { mutableStateOf(false) }
+    if (extending) ExtendedAddressDialog(inbox, onDismiss = { extending = false })
     Scaffold(
         topBar = {
             TopAppBar(
@@ -78,6 +89,9 @@ fun InboxScreen(
                 actions = {
                     IconButton(onClick = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") }) {
                         Icon(CopyIcon, contentDescription = "Copy address")
+                    }
+                    if (inbox.provider.extendedAddresses) IconButton(onClick = { extending = true }) {
+                        Icon(AlternateEmailIcon, contentDescription = "Extended address")
                     }
                     IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }
                 },
@@ -147,3 +161,43 @@ private fun MessageRow(m: MailSummary, read: Boolean, onClick: () -> Unit) {
         )
     }
 }
+
+/**
+ * A variant of the address for one site: DropMail delivers `local-tag@sub.domain` to `local@domain`
+ * (tag and sub: letters), so a site that refuses the plain address, or one the user would rather
+ * not give the real address to, gets an address of its own. Nothing is stored: the tag is only a
+ * label the sender sees.
+ */
+@Composable
+private fun ExtendedAddressDialog(inbox: Inbox, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val local = inbox.address.substringBefore('@')
+    val domain = inbox.address.substringAfter('@')
+    var tag by rememberSaveable { mutableStateOf(randomLetters(6)) }
+    val sub = rememberSaveable { randomLetters(4) }
+    val extended = "$local-${tag.ifBlank { "tag" }}@$sub.$domain"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Extended address") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Mail sent to this variant lands in the same inbox; the tag tells the sender apart. Handy for a site that refuses the plain address.")
+                OutlinedTextField(
+                    value = tag,
+                    // Letters only, as the service allows; the random subdomain part is not editable.
+                    onValueChange = { tag = it.lowercase().filter { c -> c in 'a'..'z' }.take(20) },
+                    singleLine = true,
+                    label = { Text("Tag") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(extended, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { context.copyToClipboard(extended, "Copied: $extended"); onDismiss() }) { Text("Copy") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+private fun randomLetters(length: Int): String = (1..length).map { ('a'..'z').random() }.joinToString("")

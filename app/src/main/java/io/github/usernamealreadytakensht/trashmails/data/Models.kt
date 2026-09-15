@@ -22,6 +22,8 @@ enum class Provider(
     val subdomainOptional: Boolean = false,
     /** The service picks among [domains] unless one is chosen: "Random" comes first and is the default. */
     val randomDomain: Boolean = false,
+    /** Any `local-tag@sub.domain` (tag and sub made of letters) is delivered to `local@domain`. */
+    val extendedAddresses: Boolean = false,
 ) {
     // Declaration order is the display order within a group (open source first, unavailable last).
     INBOX_KITTEN("Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten"),
@@ -51,6 +53,7 @@ enum class Provider(
             "mailpwr.com", "mailtowin.com", "maximail.fyi", "maximail.vip", "mimimail.me", "spymail.one", "yomail.info",
         ),
         randomDomain = true,
+        extendedAddresses = true,
     ),
     BURNER_KIWI(
         "Burner Kiwi", "random address", false, 5, "https://burner.kiwi",
