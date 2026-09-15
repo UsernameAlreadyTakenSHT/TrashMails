@@ -1,14 +1,19 @@
 package io.github.usernamealreadytakensht.trashmails.data
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.IOException
 import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /** The HTTP calls the providers make: the real one is OkHttp ([Http]); tests substitute canned replies. */
 interface HttpApi {
@@ -42,16 +47,33 @@ object Http : HttpApi {
     override suspend fun delete(url: String, headers: Map<String, String>): String =
         execute(Request.Builder().url(url).delete().apply { headers.forEach { (k, v) -> header(k, v) } }.build())
 
-    private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
-        client.newCall(request).execute().use { resp ->
-            val text = resp.body?.let { body ->
-                val source = body.source()
-                if (source.request(MAX_BODY_BYTES + 1)) throw ProviderException("The reply from ${request.url.host} is too large")
-                source.readUtf8()
-            }.orEmpty()
-            if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host, text.take(MAX_ERROR_BODY))
-            text
-        }
+    /**
+     * Runs the call on OkHttp's own threads and cancels it when the coroutine is cancelled, so
+     * leaving a screen really aborts the transfer instead of letting it finish and be discarded.
+     */
+    private suspend fun execute(request: Request): String = suspendCancellableCoroutine { continuation ->
+        val call = client.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (continuation.isActive) continuation.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val result = runCatching { response.use { read(it, request) } }
+                if (continuation.isActive) result.fold(continuation::resume, continuation::resumeWithException)
+            }
+        })
+    }
+
+    private fun read(resp: Response, request: Request): String {
+        val text = resp.body?.let { body ->
+            val source = body.source()
+            if (source.request(MAX_BODY_BYTES + 1)) throw ProviderException("The reply from ${request.url.host} is too large")
+            source.readUtf8()
+        }.orEmpty()
+        if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host, text.take(MAX_ERROR_BODY))
+        return text
     }
 }
 

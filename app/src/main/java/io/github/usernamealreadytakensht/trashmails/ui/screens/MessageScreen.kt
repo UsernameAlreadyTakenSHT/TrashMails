@@ -280,6 +280,8 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                 view.loadDataWithBaseURL(null, withViewport(html), "text/html", "utf-8", null)
             }
         },
+        // Leaving the message (or switching to plain text) frees the renderer at once.
+        onRelease = { view -> view.stopLoading(); view.destroy() },
     )
 }
 
