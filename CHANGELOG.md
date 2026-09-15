@@ -22,6 +22,8 @@ for everything it rated red or orange.
 - **The create dialog cannot be dismissed by a tap outside while creating**; creation errors have their own line and no longer share the home snackbar.
 - Preferences are excluded from cloud backup and device-to-device transfer explicitly; provider error text is bounded on screen; server ids are URL-encoded; a non-ASCII link host is shown with its punycode form.
 - Providers are registered in one exhaustive place (a new one does not compile until implemented); template dependencies removed.
+- **Fewer requests**: no listing while a message is read, and an inbox reopened within the refresh interval shows its last listing instead of fetching again; a card whose account is being deleted is dimmed and inert.
+- Wording, screen-reader descriptions and touch targets: "3 h 12 min", "Remove address", "Copy message text", "Open inbox", 48 dp radio and checkbox rows, headings, a link dialog that wraps at large fonts; an exhausted provider row reads "Limit reached for today"; very long plain bodies are cut with a "Show all" button.
 
 ### Fixed
 - **The inbox empty state said "Auto-refresh every minute" whatever the setting** — misleading in manual mode.
