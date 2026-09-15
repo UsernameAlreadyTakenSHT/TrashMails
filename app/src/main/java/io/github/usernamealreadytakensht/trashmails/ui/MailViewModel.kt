@@ -67,6 +67,9 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     /** An inbox is being created (the create dialog stays open meanwhile). */
     var creating by mutableStateOf(false)
         private set
+    /** Why the last creation failed; shown inside the create dialog, cleared with it. */
+    var createError by mutableStateOf<String?>(null)
+        private set
     /** The open inbox is being listed. */
     var listLoading by mutableStateOf(false)
         private set
@@ -209,17 +212,19 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     }
 
     fun createInbox(provider: Provider, name: String?) {
-        provider.unavailableReason?.let { error = "${provider.label} is unavailable: $it"; return }
+        provider.unavailableReason?.let { createError = "${provider.label} is unavailable: $it"; return }
         val status = quota.status(provider)
         if (status.exhausted) {
-            error = "${provider.label}: limit of ${status.limit} per 24 h reached"
+            createError = "${provider.label}: limit of ${status.limit} per 24 h reached"
             return
         }
         createJob?.cancel()
         creating = true
-        error = null
+        createError = null
         createJob = viewModelScope.launch {
-            val inbox = attempt("Could not create the inbox") { providers.getValue(provider).createInbox(name) }
+            val inbox = attempt("Could not create the address", onError = { createError = it }) {
+                providers.getValue(provider).createInbox(name)
+            }
             creating = false
             inbox ?: return@launch
             if (inboxes.none { it.key == inbox.key }) {
@@ -239,6 +244,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         createJob?.cancel()
         createJob = null
         creating = false
+        createError = null
     }
 
     fun canDeleteInbox(inbox: Inbox) = providerFor(inbox).canDeleteInbox

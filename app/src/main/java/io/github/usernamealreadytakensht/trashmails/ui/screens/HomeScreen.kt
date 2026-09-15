@@ -87,6 +87,7 @@ fun HomeScreen(
     inboxes: List<Inbox>,
     unread: Map<String, Int>,
     creating: Boolean,
+    createError: String?,
     error: String?,
     notice: String?,
     quotas: Map<Provider, CreationQuota.Status>,
@@ -104,8 +105,7 @@ fun HomeScreen(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var toDelete by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    // While the create dialog is open its errors are shown inside it.
-    val host = rememberMessageHost(error?.takeIf { !showDialog }, notice, onDismissError, onDismissNotice)
+    val host = rememberMessageHost(error, notice, onDismissError, onDismissNotice)
 
     Scaffold(
         topBar = {
@@ -156,10 +156,10 @@ fun HomeScreen(
     if (showDialog) {
         CreateInboxDialog(
             creating = creating,
-            error = error,
+            error = createError,
             quotas = quotas,
             defaultProvider = defaultProvider,
-            onDismiss = { showDialog = false; onCancelCreate(); error?.let(onDismissError) },
+            onDismiss = { showDialog = false; onCancelCreate() },
             onCreate = onCreate,
         )
     }

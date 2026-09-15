@@ -83,6 +83,7 @@ private fun App(vm: MailViewModel) {
             inboxes = vm.inboxes,
             unread = vm.unread,
             creating = vm.creating,
+            createError = vm.createError,
             error = vm.error,
             notice = vm.notice,
             quotas = vm.quotas,
