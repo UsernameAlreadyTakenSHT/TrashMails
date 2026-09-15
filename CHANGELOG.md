@@ -1,4 +1,4 @@
-## Unreleased
+## v0.4.0 — 2026-09-15
 
 A second five-angle review of 0.3.0 (bugs, security, performance, UX, code quality) and the fixes
 for everything it rated red or orange.
