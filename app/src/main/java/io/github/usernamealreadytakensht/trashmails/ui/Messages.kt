@@ -14,7 +14,7 @@ import javax.net.ssl.SSLException
 
 /** A short, user-facing line for a failed provider call, instead of the exception's own text. */
 fun Throwable.userMessage(fallback: String): String = when (this) {
-    is ProviderException -> message?.takeIf { it.isNotBlank() } ?: fallback
+    is ProviderException -> message?.forDisplay() ?: fallback
     is UnknownHostException -> "No internet connection"
     is SSLException -> "Secure connection failed"
     is InterruptedIOException -> "The server took too long to answer"
@@ -22,6 +22,13 @@ fun Throwable.userMessage(fallback: String): String = when (this) {
     is JSONException -> "Unexpected reply from the server"
     else -> fallback
 }
+
+/** Provider text may come from a server: one line, no control characters, bounded. */
+private fun String.forDisplay(): String? =
+    replace(CONTROL_CHARS, " ").trim().take(MAX_MESSAGE_LENGTH).takeIf { it.isNotEmpty() }
+
+private val CONTROL_CHARS = Regex("""[p{Cntrl}s]+""")
+private const val MAX_MESSAGE_LENGTH = 200
 
 /**
  * A [SnackbarHostState] fed by the ViewModel's [error] (with an OK action) and [notice] (short,

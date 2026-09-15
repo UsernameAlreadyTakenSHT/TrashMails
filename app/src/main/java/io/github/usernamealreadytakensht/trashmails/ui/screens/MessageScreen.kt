@@ -68,6 +68,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.CopyIcon
 import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDate
 import java.io.ByteArrayInputStream
+import java.net.IDN
 
 /**
  * One message. The body is plain text unless [Settings.renderHtml] is on; either way the
@@ -320,7 +321,11 @@ private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClie
 @Composable
 private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
     val uri = Uri.parse(url)
-    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host ?: url
+    // A non-ASCII host is shown with its punycode form too: a look-alike letter must not pass for the real site.
+    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host?.let { host ->
+        val ascii = runCatching { IDN.toASCII(host) }.getOrDefault(host)
+        if (ascii.equals(host, ignoreCase = true)) host else "$host ($ascii)"
+    } ?: url
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (uri.scheme.equals("mailto", ignoreCase = true)) "Write to this address?" else "Open this site?") },
