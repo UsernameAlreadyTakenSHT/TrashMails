@@ -86,6 +86,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.retentionInfo
 fun HomeScreen(
     inboxes: List<Inbox>,
     unread: Map<String, Int>,
+    deleting: Set<String>,
     creating: Boolean,
     createError: String?,
     error: String?,
@@ -144,6 +145,7 @@ fun HomeScreen(
                     InboxCard(
                         inbox = inbox,
                         unread = unread[inbox.key],
+                        busy = inbox.key in deleting,
                         onClick = { onOpen(inbox) },
                         onCopy = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") },
                         onDelete = { toDelete = inbox.key },
@@ -192,11 +194,18 @@ private fun AddressLine(address: String) {
 private fun InboxCard(
     inbox: Inbox,
     unread: Int?,
+    busy: Boolean,
     onClick: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClickLabel = "Open inbox", onClick = onClick)) {
+    // While its account is being deleted on the server the card is dimmed and inert (no second DELETE).
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (busy) 0.5f else 1f)
+            .clickable(enabled = !busy, onClickLabel = "Open inbox", onClick = onClick),
+    ) {
         Row(
             Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -214,10 +223,10 @@ private fun InboxCard(
                     }
                 }
             }
-            FilledTonalIconButton(onClick = onCopy) {
+            FilledTonalIconButton(onClick = onCopy, enabled = !busy) {
                 Icon(CopyIcon, contentDescription = "Copy address")
             }
-            IconButton(onClick = onDelete) {
+            IconButton(onClick = onDelete, enabled = !busy) {
                 Icon(Icons.Default.Delete, contentDescription = "Remove address")
             }
         }

@@ -82,6 +82,7 @@ private fun App(vm: MailViewModel) {
         Screen.Home -> HomeScreen(
             inboxes = vm.inboxes,
             unread = vm.unread,
+            deleting = vm.deleting,
             creating = vm.creating,
             createError = vm.createError,
             error = vm.error,
