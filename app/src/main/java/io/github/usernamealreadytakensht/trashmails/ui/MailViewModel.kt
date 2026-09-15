@@ -202,11 +202,12 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private fun isOld(inbox: Inbox, maxAgeMs: Long) =
         inbox.createdAt < System.currentTimeMillis() - maxAgeMs && inbox.key != currentInbox()?.key
 
-    /** Drops the addresses older than the setting allows (local list only; the open one is kept). */
+    /** Drops the addresses older than the setting allows (local list and caches; the open one is kept). */
     private fun forgetOldInboxes() {
         val maxAge = settings.forgetAfterMs ?: return
-        val kept = inboxes.filterNot { isOld(it, maxAge) }
-        if (kept.size != inboxes.size) {
+        val (old, kept) = inboxes.partition { isOld(it, maxAge) }
+        if (old.isNotEmpty()) {
+            old.forEach { providerFor(it).forgetInbox(it) }
             inboxes = kept
             unread = unread.filterKeys { key -> kept.any { it.key == key } }
             read = read.filterKeys { key -> kept.any { it.key == key } }
