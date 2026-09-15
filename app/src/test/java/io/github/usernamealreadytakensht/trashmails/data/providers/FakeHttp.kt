@@ -39,6 +39,6 @@ class FakeHttp : HttpApi {
         fun body(text: String): () -> String = { text }
 
         /** A step failing with an HTTP error. */
-        fun error(code: Int, body: String = ""): () -> String = { throw HttpException(code, "fake.host", body) }
+        fun httpError(code: Int, body: String = ""): () -> String = { throw HttpException(code, "fake.host", body) }
     }
 }

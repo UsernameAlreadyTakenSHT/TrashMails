@@ -4,7 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
-import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.error
+import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.httpError
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.fixture
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -44,7 +44,7 @@ class MailTmProviderTest {
     fun createInbox_explainsA422() = runBlocking {
         val http = FakeHttp()
             .on("/domains", fixture("mailtm_domains"))
-            .on("/accounts", error(422, FakeHttp.fixture("mailtm_422")()))
+            .on("/accounts", httpError(422, FakeHttp.fixture("mailtm_422")()))
         val e = assertThrows(ProviderException::class.java) { runBlocking { MailTmProvider(http).createInbox("admin") } }
         assertEquals("mail.tm: address: The username \"admin\" is not valid.", e.message)
     }
@@ -71,7 +71,7 @@ class MailTmProviderTest {
     fun listMessages_refreshesTheTokenOnceOn401() = runBlocking {
         val http = FakeHttp()
             .on("/token", fixture("mailtm_token"))
-            .on("/messages", error(401), fixture("mailtm_messages_empty"))
+            .on("/messages", httpError(401), fixture("mailtm_messages_empty"))
 
         val list = MailTmProvider(http).listMessages(inbox)
 
@@ -81,7 +81,7 @@ class MailTmProviderTest {
 
     @Test
     fun aDeletedAccountIsReportedAsSuch() = runBlocking {
-        val http = FakeHttp().on("/token", error(401, """{"code":401,"message":"Invalid credentials."}"""))
+        val http = FakeHttp().on("/token", httpError(401, """{"code":401,"message":"Invalid credentials."}"""))
         val e = assertThrows(ProviderException::class.java) { runBlocking { MailTmProvider(http).listMessages(inbox) } }
         assertTrue(e.message!!.contains("no longer exists"))
     }
@@ -106,13 +106,13 @@ class MailTmDeletedAccountTest {
 
     @Test
     fun deleteInbox_succeedsWhenTheAccountIsAlreadyGone() = runBlocking {
-        val http = FakeHttp().on("/token", error(401, """{"code":401,"message":"Invalid credentials."}"""))
+        val http = FakeHttp().on("/token", httpError(401, """{"code":401,"message":"Invalid credentials."}"""))
         assertTrue(MailTmProvider(http).deleteInbox(inbox))
     }
 
     @Test
     fun deleteInbox_succeedsOn404() = runBlocking {
-        val http = FakeHttp().on("/token", fixture("mailtm_token")).on("/accounts/gone", error(404))
+        val http = FakeHttp().on("/token", fixture("mailtm_token")).on("/accounts/gone", httpError(404))
         assertTrue(MailTmProvider(http).deleteInbox(inbox))
     }
 }

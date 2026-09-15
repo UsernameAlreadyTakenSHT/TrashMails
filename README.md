@@ -55,14 +55,21 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Minimum Andro
 app/src/main/java/io/github/usernamealreadytakensht/trashmails/
 ├── data/
 │   ├── Models.kt            Provider enum, Inbox, MailSummary, MailProvider interface
-│   ├── Http.kt              OkHttp client, name helpers
+│   ├── Http.kt              HttpApi + OkHttp implementation, name helpers
+│   ├── Prefs.kt             The few SharedPreferences calls the stores use
 │   ├── InboxStore.kt        Local persistence of inboxes
+│   ├── ReadStore.kt         Read message ids and unread counts
 │   ├── CreationQuota.kt     Per-provider creation rate limit
 │   ├── Settings.kt          User preferences
-│   └── providers/           One implementation per provider
+│   ├── MimeText.kt          Text and HTML parts of a raw RFC 822 message
+│   └── providers/           One implementation per provider, registered in Providers.kt
 ├── ui/
 │   ├── MailViewModel.kt     State, navigation, polling
+│   ├── Messages.kt          Error wording, snackbar host
 │   ├── HtmlText.kt          HTML email to plain text
+│   ├── ProviderInfo.kt      Retention rules shown per provider
+│   ├── ProviderLogo.kt      Provider logos
+│   ├── Util.kt              Clipboard, date and duration formatting
 │   └── screens/             Home, inbox, message and settings screens
 └── ui/theme/                Material 3 theme
 ```

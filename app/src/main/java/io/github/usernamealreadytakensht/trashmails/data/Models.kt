@@ -27,6 +27,11 @@ enum class Provider(
     );
 
     val available: Boolean get() = unavailableReason == null
+
+    companion object {
+        /** The entry named [name], or null: stored names may come from a version that no longer has it. */
+        fun fromName(name: String?): Provider? = entries.firstOrNull { it.name == name }
+    }
     /** What follows the name in the create dialog's field: the domain when there is one fixed. */
     val fieldSuffix: String get() = if (domainHint.startsWith("@")) domainHint else "@…"
     val openSource: Boolean get() = sourceUrl != null

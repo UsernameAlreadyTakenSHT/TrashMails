@@ -8,7 +8,6 @@
 /captures
 .externalNativeBuild
 .cxx
-local.properties
 
 # Release signing (never commit)
 /trashmails-release.jks

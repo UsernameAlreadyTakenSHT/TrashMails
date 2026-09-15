@@ -30,7 +30,7 @@ class InboxStore(private val prefs: Prefs) {
         .put("expiresAt", i.expiresAt)
 
     private fun fromJson(o: JSONObject): Inbox? {
-        val provider = runCatching { Provider.valueOf(o.getString("provider")) }.getOrNull() ?: return null
+        val provider = Provider.fromName(o.optString("provider")) ?: return null
         return Inbox(
             id = o.getString("id"),
             provider = provider,

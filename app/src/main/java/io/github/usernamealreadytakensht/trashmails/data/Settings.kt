@@ -53,7 +53,7 @@ class SettingsStore(private val prefs: Prefs) {
             blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
             forgetAfterHours = prefs.getInt(FORGET_AFTER, defaults.forgetAfterHours),
             theme = prefs.getString(THEME) ?: defaults.theme,
-            lastProvider = prefs.getString(LAST_PROVIDER)?.let { name -> Provider.entries.firstOrNull { it.name == name } }
+            lastProvider = Provider.fromName(prefs.getString(LAST_PROVIDER))
                 ?: defaults.lastProvider,
             copyOnCreate = prefs.getBoolean(COPY_ON_CREATE, defaults.copyOnCreate),
         )
