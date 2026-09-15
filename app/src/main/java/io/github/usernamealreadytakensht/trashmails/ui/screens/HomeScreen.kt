@@ -61,9 +61,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -253,6 +255,8 @@ private fun CreateInboxDialog(
     var provider by rememberSaveable { mutableStateOf(defaultProvider.takeIf { it.available } ?: Provider.INBOX_KITTEN) }
     var name by rememberSaveable { mutableStateOf("") }
     var infoFor by rememberSaveable { mutableStateOf<Provider?>(null) }
+    // The provider a creation was asked for: its failure is only shown while that one is selected.
+    var errorFor by rememberSaveable { mutableStateOf<Provider?>(null) }
     // The provider's choices start from its defaults every time: first domain (or random), no scrambling.
     var domain by rememberSaveable(provider) { mutableStateOf(provider.domains.firstOrNull()?.takeUnless { provider.randomDomain }) }
     var scramble by rememberSaveable(provider) { mutableStateOf(false) }
@@ -275,11 +279,13 @@ private fun CreateInboxDialog(
         properties = DialogProperties(dismissOnClickOutside = !creating, dismissOnBackPress = !creating),
         title = { Text("New address") },
         text = {
-            Column(
-                Modifier.height(contentHeight).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.height(contentHeight), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // The list takes what the fields below leave and scrolls on its own, so the name
+                // field and the options stay in sight whatever the font size.
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     PROVIDER_GROUPS.forEach { (title, providers) ->
                         Text(
                             title,
@@ -292,6 +298,7 @@ private fun CreateInboxDialog(
                                 p,
                                 selected = provider == p,
                                 exhausted = quotas[p]?.exhausted == true,
+                                enabled = !creating,
                                 onClick = { if (p.available) provider = p },
                                 onInfo = { infoFor = p },
                             )
@@ -300,7 +307,8 @@ private fun CreateInboxDialog(
                 }
                 QuotaLine(status)
                 // Only while there is something to say: the dialog height is fixed, so no space is reserved.
-                if (creating || error != null) CreateStatusLine(creating, error)
+                val shownError = error?.takeIf { errorFor == provider }
+                if (creating || shownError != null) CreateStatusLine(creating, shownError)
                 // The name field carries the domain choice as its suffix; a provider that names the
                 // address itself shows the domain field alone (or a disabled name field when there
                 // is nothing to choose at all).
@@ -343,7 +351,7 @@ private fun CreateInboxDialog(
         confirmButton = {
             TextButton(
                 enabled = !creating && !exhausted,
-                onClick = { onCreate(provider, name.takeIf { provider.allowsCustomName && it.isNotBlank() }, options) },
+                onClick = { errorFor = provider; onCreate(provider, name.takeIf { provider.allowsCustomName && it.isNotBlank() }, options) },
             ) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -559,6 +567,7 @@ private fun ProviderRow(
     provider: Provider,
     selected: Boolean,
     exhausted: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
     onInfo: () -> Unit,
 ) {
@@ -571,7 +580,7 @@ private fun ProviderRow(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             )
-            .selectable(selected = selected, enabled = !unavailable, onClick = onClick, role = Role.RadioButton)
+            .selectable(selected = selected, enabled = enabled && !unavailable, onClick = onClick, role = Role.RadioButton)
             .padding(start = 12.dp, top = 2.dp, bottom = 2.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -603,7 +612,7 @@ private fun ProviderRow(
         IconButton(onClick = onInfo) {
             Icon(Icons.Outlined.Info, contentDescription = "About ${provider.label}")
         }
-        RadioButton(selected = selected, onClick = null, enabled = !unavailable, modifier = dim.size(36.dp))
+        RadioButton(selected = selected, onClick = null, enabled = enabled && !unavailable, modifier = dim.size(36.dp))
     }
 }
 
@@ -611,6 +620,8 @@ private fun ProviderRow(
 @Composable
 private fun CreateStatusLine(creating: Boolean, error: String?) {
     Row(
+        // Announced by screen readers when it appears or changes: the only feedback after Create.
+        Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
