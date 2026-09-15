@@ -124,15 +124,18 @@ class DropMailProviderTest {
     @Test
     fun listMessages_adoptsTheLiveSession_whenTheAddressIsStillInUse() = runBlocking {
         val inUse = """{"errors":[{"extensions":{"code":"resolver_error"},"path":["restoreAddress"],"message":"already_in_use"}],"data":{"restoreAddress":null}}"""
-        val sessions = """{"data":{"sessions":[{"id":"U2Vzc2lvbjpvdGhlcg","addresses":[{"address":"someone@dropmail.me"}]},{"id":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","addresses":[{"address":"alxtherxj@10mail.org"}]}]}}"""
+        val sessions = """{"data":{"sessions":[{"id":"U2Vzc2lvbjpvdGhlcg","addresses":[{"address":"someone@dropmail.me","restoreKey":"other"}]},{"id":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","addresses":[{"address":"alxtherxj@10mail.org","restoreKey":"0adoptedkey"}]}]}}"""
         val http = http().onBody("introduceSession", body(emptySession)).onBody("restoreAddress", body(inUse))
             .onBody("sessions {", body(sessions)).onBody("session(id:", fixture("dropmail_session"))
-        val p = provider(http)
+        val prefs = MemoryPrefs()
+        val p = provider(http, prefs)
 
         assertTrue(p.listMessages(inbox).isEmpty())
-        // The session found holding the address is the one listed from now on.
+        // The session found holding the address is the one listed from now on, with the key it holds:
+        // the one this app knew was rotated by the restore whose reply never got saved.
         assertEquals(listOf("Second", "Probe one"), p.listMessages(inbox).map(MailSummary::subject))
         assertTrue(http.calls.last().query.contains("session(id: \"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97\")"))
+        assertTrue(prefs.getString("session:${inbox.key}")!!.contains("0adoptedkey"))
     }
 
     @Test

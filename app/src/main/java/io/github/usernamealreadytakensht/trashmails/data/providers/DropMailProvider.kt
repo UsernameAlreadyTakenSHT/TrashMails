@@ -14,6 +14,8 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.OffsetDateTime
@@ -122,32 +124,47 @@ class DropMailProvider(
 
     /**
      * A new session holding the address again; the restore key it hands back replaces the old one.
-     * An address the server says is still in use sits in a live session this app lost track of
-     * (a restore that failed half-way): that session is looked up and adopted instead.
+     * The server rotates the key as soon as it answers, so the mutation and the save of its reply
+     * run as one non-cancellable step: a screen left while the reply is in flight must not leave
+     * the app holding a key the server no longer accepts. An address the server says is still in
+     * use sits in a live session this app lost track of (a restore interrupted before its save,
+     * a process death): that session is looked up and adopted, with the key it currently holds.
      */
     private suspend fun restore(inbox: Inbox, restoreKey: String) {
         val created = graphql("mutation { introduceSession(input: {withAddress: false}) { id } }")
         val sessionId = created.data("introduceSession")?.optString("id")?.takeIf { it.isNotBlank() }
             ?: fail(created, "DropMail.me could not open a session")
         val input = "sessionId: ${quote(sessionId)}, mailAddress: ${quote(inbox.address)}, restoreKey: ${quote(restoreKey)}"
-        val restored = graphql("mutation { restoreAddress(input: {$input}) { restoreKey } }")
-        val newKey = restored.data("restoreAddress")?.optString("restoreKey")?.takeIf { it.isNotBlank() }
-            ?: when (restored.errorMessage()) {
-                "bad_signature" -> throw ProviderException("DropMail.me rejected the restore key of ${inbox.address}: the address cannot be brought back")
-                "already_in_use" -> { adoptSession(inbox, restoreKey); return }
-                else -> fail(restored, "DropMail.me could not restore the address")
+        val restored = withContext(NonCancellable) {
+            graphql("mutation { restoreAddress(input: {$input}) { restoreKey } }").also { reply ->
+                reply.data("restoreAddress")?.optString("restoreKey")?.takeIf { it.isNotBlank() }?.let { saveSession(inbox, sessionId, it) }
             }
-        saveSession(inbox, sessionId, newKey)
+        }
+        if (restored.data("restoreAddress") != null) return
+        when (restored.errorMessage()) {
+            "bad_signature" -> throw ProviderException("DropMail.me rejected the restore key of ${inbox.address}: the address cannot be brought back")
+            "already_in_use" -> adoptSession(inbox)
+            else -> fail(restored, "DropMail.me could not restore the address")
+        }
     }
 
-    private suspend fun adoptSession(inbox: Inbox, restoreKey: String) {
-        val json = graphql("{ sessions { id addresses { address } } }")
+    private suspend fun adoptSession(inbox: Inbox) {
+        val json = graphql("{ sessions { id addresses { address restoreKey } } }")
         val sessions = json.optJSONObject("data")?.optJSONArray("sessions") ?: fail(json, "DropMail.me could not list its sessions")
-        val holder = (0 until sessions.length()).mapNotNull { sessions.optJSONObject(it) }.firstOrNull { s ->
-            val addresses = s.optJSONArray("addresses") ?: return@firstOrNull false
-            (0 until addresses.length()).any { addresses.optJSONObject(it)?.optString("address") == inbox.address }
-        } ?: throw ProviderException("DropMail.me says ${inbox.address} is in use, but not by this app")
-        saveSession(inbox, holder.getString("id"), restoreKey)
+        for (i in 0 until sessions.length()) {
+            val session = sessions.optJSONObject(i) ?: continue
+            val addresses = session.optJSONArray("addresses") ?: continue
+            for (j in 0 until addresses.length()) {
+                val address = addresses.optJSONObject(j) ?: continue
+                if (address.optString("address") != inbox.address) continue
+                val key = address.text("restoreKey") ?: fail(json, "DropMail.me listed the address without its restore key")
+                saveSession(inbox, session.getString("id"), key)
+                return
+            }
+        }
+        // The live session belongs to a token this app no longer has (a replaced token): it dies
+        // on its own ten minutes after its last access, and the address can be restored then.
+        throw ProviderException("DropMail.me still holds ${inbox.address} in a session this app cannot reach: try again in ten minutes")
     }
 
     private suspend fun domainId(name: String): String {
