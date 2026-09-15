@@ -384,6 +384,7 @@ private fun RemoveInboxDialog(
                 if (canDeleteOnServer) Row(
                     Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .toggleable(value = onServer, role = Role.Checkbox, onValueChange = { onServer = it })
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -460,11 +461,15 @@ private fun ProviderRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                if (unavailable) "Unavailable" else provider.domainHint,
+                when {
+                    unavailable -> "Unavailable"
+                    exhausted -> "Limit reached for today"
+                    else -> provider.domainHint
+                },
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (unavailable) MaterialTheme.colorScheme.error
+                color = if (unavailable || exhausted) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -491,9 +496,7 @@ private fun CreateStatusLine(creating: Boolean, error: String?) {
             error != null -> Text(
                 error,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.error, // no line cap: a mail.tm refusal can be long and the column scrolls
             )
         }
     }

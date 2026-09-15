@@ -333,16 +333,21 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 SelectionContainer {
-                    Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        url,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         },
         confirmButton = { TextButton(onClick = onOpen) { Text("Open") } },
+        // Two buttons straight in the slot: the dialog wraps them when the font is scaled up.
         dismissButton = {
-            Row {
-                TextButton(onClick = onCopy) { Text("Copy link") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-            }
+            TextButton(onClick = onCopy) { Text("Copy link") }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
