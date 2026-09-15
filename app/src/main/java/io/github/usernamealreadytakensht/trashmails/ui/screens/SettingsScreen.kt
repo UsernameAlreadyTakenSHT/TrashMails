@@ -77,8 +77,8 @@ fun SettingsScreen(
             SectionTitle("Reading emails")
             SettingRow(
                 title = "Render HTML emails",
-                description = "Off: every email is shown as plain text, so nothing the sender wrote is " +
-                    "rendered or fetched. A single message can still be viewed as HTML from its menu.",
+                description = "Off: every email is shown as plain text, so no HTML from the sender is rendered and " +
+                    "nothing is fetched. A single message can still be viewed as HTML from its menu.",
                 checked = settings.renderHtml,
                 onCheckedChange = { onChange(settings.copy(renderHtml = it)) },
             )
@@ -102,7 +102,7 @@ fun SettingsScreen(
             SectionTitle("Inboxes")
             ChoiceRow(
                 title = "Auto-refresh",
-                description = "How often the open inbox is listed again. Manual: only when you tap refresh " +
+                description = "How often the open inbox checks for new mail. Manual: only when you tap refresh " +
                     "(at most once per 30 s).",
                 choices = Settings.POLL_INTERVALS,
                 selected = settings.pollIntervalSec,
@@ -132,7 +132,7 @@ fun SettingsScreen(
             SettingRow(
                 title = "Block screenshots",
                 description = "The app cannot be captured or screen-recorded, and shows blank in the recent apps: " +
-                    "verification codes stay on the screen only.",
+                    "verification codes never leave the screen.",
                 checked = settings.blockScreenshots,
                 onCheckedChange = { onChange(settings.copy(blockScreenshots = it)) },
             )

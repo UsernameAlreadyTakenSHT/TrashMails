@@ -42,13 +42,13 @@ fun formatRemaining(expiresAt: Long?): String? {
     if (left <= 0) return "expired"
     val h = left / 3_600_000
     val m = (left % 3_600_000) / 60_000
-    return if (h > 0) "expires in ${h}h${m.toString().padStart(2, '0')}" else "expires in ${m} min"
+    return if (h > 0) "expires in $h h ${m.toString().padStart(2, '0')} min" else "expires in $m min"
 }
 
-/** "3h12" / "12 min" for a duration in milliseconds. */
+/** "3 h 12 min" / "12 min" for a duration in milliseconds. */
 fun formatDuration(millis: Long): String {
     val left = millis.coerceAtLeast(0)
     val h = left / 3_600_000
     val m = (left % 3_600_000) / 60_000
-    return if (h > 0) "${h}h${m.toString().padStart(2, '0')}" else "${m.coerceAtLeast(1)} min"
+    return if (h > 0) "$h h ${m.toString().padStart(2, '0')} min" else "${m.coerceAtLeast(1)} min"
 }

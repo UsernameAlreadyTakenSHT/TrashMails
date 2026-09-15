@@ -18,7 +18,7 @@ enum class Provider(
     MAILDROP("Maildrop", "@maildrop.cc", true, 20, "https://maildrop.cc", "https://maildrop.cc/privacy/", sourceUrl = "https://github.com/m242/maildrop"),
     // Guerrilla Mail has no separate policy page: the privacy section lives in its terms.
     GUERRILLA_MAIL("Guerrilla Mail", "@guerrillamailblock.com", true, 20, "https://www.guerrillamail.com", "https://www.guerrillamail.com/tos"),
-    MAIL_TM("mail.tm", "@ domain chosen by mail.tm", true, 10, "https://mail.tm", "https://mail.tm/en/privacy/"),
+    MAIL_TM("mail.tm", "domain chosen by mail.tm", true, 10, "https://mail.tm", "https://mail.tm/en/privacy/"),
     BURNER_KIWI(
         "Burner Kiwi", "random address", false, 5, "https://burner.kiwi",
         sourceUrl = "https://github.com/haydenwoodhead/burner.kiwi",
@@ -27,6 +27,8 @@ enum class Provider(
     );
 
     val available: Boolean get() = unavailableReason == null
+    /** What follows the name in the create dialog's field: the domain when there is one fixed. */
+    val fieldSuffix: String get() = if (domainHint.startsWith("@")) domainHint else "@…"
     val openSource: Boolean get() = sourceUrl != null
 }
 

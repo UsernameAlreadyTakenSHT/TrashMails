@@ -358,7 +358,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         if (lastFetchKey == inbox.key) {
             val wait = MANUAL_REFRESH_MIN_MS - (System.currentTimeMillis() - lastFetchAt)
             if (wait > 0) {
-                notice = "Refresh available in ${(wait / 1000) + 1} s"
+                notice = "Refreshed less than 30 s ago · try again in ${(wait / 1000) + 1} s"
                 return
             }
         }

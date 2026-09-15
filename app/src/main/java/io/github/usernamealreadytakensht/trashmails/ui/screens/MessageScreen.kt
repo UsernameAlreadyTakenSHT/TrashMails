@@ -112,18 +112,18 @@ fun MessageScreen(
                 actions = {
                     val body = content?.text
                     if (body != null) IconButton(onClick = { context.copyToClipboard(body, "Message text copied", sensitive = true) }) {
-                        Icon(CopyIcon, contentDescription = "Copy content")
+                        Icon(CopyIcon, contentDescription = "Copy message text")
                     }
                     if (onDelete != null) IconButton(onClick = { confirmDelete = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete message")
                     }
                     // Always present so the buttons keep their place while the body loads.
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        Icon(Icons.Default.MoreVert, contentDescription = "More options")
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text(if (showHtml) "View as plain text" else "View as HTML") },
+                            text = { Text(if (showHtml && hasHtml) "View as plain text" else "View as HTML") },
                             enabled = hasHtml,
                             onClick = { showHtml = !showHtml; menuOpen = false },
                         )
@@ -138,7 +138,7 @@ fun MessageScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(summary.from, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(summary.from.ifBlank { "(unknown sender)" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     "${formatDate(summary.date)} · ${provider.label}",
                     style = MaterialTheme.typography.labelSmall,
