@@ -57,7 +57,9 @@ class MessageCache(private val prefs: Prefs) {
     )
 
     private companion object {
-        const val MAX_MESSAGES = 100
-        const val MAX_BODY_CHARS = 256 * 1024
+        // A single preference file is parsed whole on first access and rewritten whole on each change:
+        // the bounds keep it at a few megabytes at worst (50 messages of 128 KiB per part).
+        const val MAX_MESSAGES = 50
+        const val MAX_BODY_CHARS = 128 * 1024
     }
 }
