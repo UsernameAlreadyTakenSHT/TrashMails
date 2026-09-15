@@ -17,11 +17,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ReadStore
 import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
-import io.github.usernamealreadytakensht.trashmails.data.providers.BurnerKiwiProvider
-import io.github.usernamealreadytakensht.trashmails.data.providers.GuerrillaMailProvider
-import io.github.usernamealreadytakensht.trashmails.data.providers.InboxKittenProvider
-import io.github.usernamealreadytakensht.trashmails.data.providers.MailTmProvider
-import io.github.usernamealreadytakensht.trashmails.data.providers.MaildropProvider
+import io.github.usernamealreadytakensht.trashmails.data.providers.allProviders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,9 +44,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
     private val readStore = ReadStore(app)
-    private val providers: Map<Provider, MailProvider> = listOf(
-        InboxKittenProvider(), MaildropProvider(), GuerrillaMailProvider(), MailTmProvider(), BurnerKiwiProvider(),
-    ).associateBy { it.provider }
+    private val providers: Map<Provider, MailProvider> = allProviders()
 
     var inboxes by mutableStateOf(store.load())
         private set

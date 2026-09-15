@@ -79,6 +79,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDuration
 import io.github.usernamealreadytakensht.trashmails.ui.formatRemaining
 import io.github.usernamealreadytakensht.trashmails.ui.rememberMessageHost
+import io.github.usernamealreadytakensht.trashmails.ui.retentionInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -351,68 +352,6 @@ private fun LinkLine(label: String, url: String?, missing: String = "") {
         style = MaterialTheme.typography.bodySmall,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-    )
-}
-
-/** What happens to emails and the inbox on the provider's server. */
-private data class RetentionInfo(val mails: List<String>, val account: List<String>, val warning: String?)
-
-private fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
-    Provider.INBOX_KITTEN -> RetentionInfo(
-        mails = listOf(
-            "Kept on the server for about 3 days, then deleted automatically.",
-            "No manual deletion: the API does not allow it.",
-        ),
-        account = listOf(
-            "There is no account: the inbox only exists by its name.",
-            "Removing the address only forgets it in this app.",
-        ),
-        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
-    )
-    Provider.GUERRILLA_MAIL -> RetentionInfo(
-        mails = listOf(
-            "Kept on the server for 1 hour, then deleted automatically.",
-            "Can be deleted manually from this app.",
-        ),
-        account = listOf(
-            "There is no account: the inbox only exists by its name.",
-            "Removing the address only forgets it in this app.",
-        ),
-        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
-    )
-    Provider.MAIL_TM -> RetentionInfo(
-        mails = listOf(
-            "Kept on the server for 7 days, then deleted automatically.",
-            "Can be deleted manually from this app.",
-        ),
-        account = listOf(
-            "A real account (address + password) that mail.tm keeps until it is deleted.",
-            "Removing the address can delete the account on mail.tm, messages included (ticked by default); otherwise the password is just lost and nobody can open the inbox anymore.",
-        ),
-        warning = null,
-    )
-    Provider.BURNER_KIWI -> RetentionInfo(
-        mails = listOf(
-            "Expire 24 h after the inbox was created, then purged within 48 h.",
-            "No manual deletion before expiry.",
-        ),
-        account = listOf(
-            "The inbox expires by itself after 24 h.",
-            "The access token is erased from this app: nobody will be able to read it anymore.",
-        ),
-        warning = null,
-    )
-    Provider.MAILDROP -> RetentionInfo(
-        mails = listOf(
-            "Kept on the server: 10 messages max (oldest are overwritten).",
-            "The inbox is emptied after 24 h without a new email.",
-            "Can be deleted manually from this app.",
-        ),
-        account = listOf(
-            "There is no account: the inbox only exists by its name.",
-            "Removing the address only forgets it in this app.",
-        ),
-        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
     )
 }
 
