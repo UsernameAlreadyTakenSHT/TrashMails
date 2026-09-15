@@ -97,6 +97,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Last successful listing, for the manual-refresh throttle. */
     private var lastFetchKey: String? = null
     private var lastFetchAt = 0L
+    /** The error the polling loop itself last reported, so a recovery only clears that one. */
+    private var lastFetchError: String? = null
 
     private fun providerFor(inbox: Inbox) = providers.getValue(inbox.provider)
 
@@ -319,6 +321,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun fetch(inbox: Inbox) {
         listLoading = true
+        val before = error
         val list = attempt("Could not load the inbox") { providerFor(inbox).listMessages(inbox) }
         if (list != null) {
             lastFetchKey = inbox.key
@@ -326,7 +329,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             messages = list
             unread = unread + (inbox.key to countUnread(inbox, list))
             listLoaded = true
-            error = null
+            // A listing that works again clears the listing error it had set — not somebody else's
+            // (a message that failed to load keeps saying why while polling goes on behind it).
+            if (error != null && error == lastFetchError) error = null
+            lastFetchError = null
+        } else if (error != before) {
+            lastFetchError = error
         }
         listLoading = false
     }
