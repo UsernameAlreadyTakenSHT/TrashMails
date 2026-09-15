@@ -1,3 +1,34 @@
+## Unreleased
+
+A second five-angle review of 0.3.0 (bugs, security, performance, UX, code quality) and the fixes
+for everything it rated red or orange.
+
+### Added
+- **Links are tappable in the plain-text view**, through the same confirmation dialog as HTML, and a banner offers "View as HTML" when the message has an HTML part — the only way to reach that was the overflow menu.
+- **Deleting a message asks first** and confirms with a "Message deleted" notice.
+- **"Forget old addresses" asks before dropping addresses** that are already older than the chosen age.
+- **A failed automatic refresh shows one line under the top bar** — the problem and when the list was last updated — instead of a snackbar at every tick.
+- **The open screen survives a process death** (coming back from the browser on a low-memory phone): the inbox is listed again and the message re-fetched.
+- **Unread badges survive a restart**; the badge and each row are announced as unread by screen readers.
+- **Unit tests** for the stores (round trips, malformed data, quota window), the MIME reader, session renewal, and the hostile-input cases of the HTML converter (51 tests).
+
+### Changed
+- **The settings button moved to the top bar**; it was a small button above the + that covered the last card's buttons.
+- **The message WebView only follows navigations the user tapped**: `<meta refresh>` and frame loads are dropped (with link confirmation off they opened the browser — and disclosed the reader's IP — on opening the mail), forms (POST) and any navigation of the mail frame get an empty reply whatever the image policy, and file / content access is off.
+- **The HTML-to-text converter runs once, off the main thread, in linear time**, capped at 1 MiB: it ran in the composable twice per recomposition and a crafted message with unclosed tags could freeze the app.
+- **HTTP calls are cancelled when their screen is left**; the message WebView is destroyed on leaving.
+- **Guerrilla Mail drops a rejected session and attaches again** instead of failing until the app restarts; its session token is no longer stored.
+- **Maildrop messages without HTML are read from their MIME parts** (quoted-printable, base64, charset) instead of showing raw headers.
+- **The create dialog cannot be dismissed by a tap outside while creating**; creation errors have their own line and no longer share the home snackbar.
+- Preferences are excluded from cloud backup and device-to-device transfer explicitly; provider error text is bounded on screen; server ids are URL-encoded; a non-ASCII link host is shown with its punycode form.
+- Providers are registered in one exhaustive place (a new one does not compile until implemented); template dependencies removed.
+
+### Fixed
+- **The inbox empty state said "Auto-refresh every minute" whatever the setting** — misleading in manual mode.
+- **A mail.tm account already purged could not be removed** with "Also delete the account" ticked.
+- **A poll that succeeded wiped an unrelated error**, turning "This message has expired" into "(empty message)".
+- **Deleted messages could come back** through a poll in flight, the unread badge could count a deleted message, and deleting a mail.tm account while its inbox was open kept polling it.
+
 ## v0.3.0 — 2026-09-15
 
 Reading emails is now safe by default — plain text, no remote image, a look at every link before
