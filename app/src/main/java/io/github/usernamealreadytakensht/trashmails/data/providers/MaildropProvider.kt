@@ -6,6 +6,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
+import io.github.usernamealreadytakensht.trashmails.data.MimeText
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
@@ -61,9 +62,11 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
         )
         val m = data.optJSONObject("message") ?: throw ProviderException("Message not found")
         val html = m.optString("html").takeIf { it.isNotBlank() }
-        // `data` is the raw message (headers + body): only useful when there is no HTML.
-        val raw = m.optString("data").takeIf { it.isNotBlank() }
-        return MailContent(html = html, text = if (html == null) raw else null)
+        if (html != null) return MailContent(html = html, text = null)
+        // No HTML: `data` is the raw RFC 822 message (headers + body), read for its text or HTML part.
+        val raw = m.optString("data").takeIf { it.isNotBlank() } ?: return MailContent(null, null)
+        val parts = MimeText.parse(raw)
+        return MailContent(html = parts.html, text = parts.text)
     }
 
     override val canDeleteMessages get() = true
