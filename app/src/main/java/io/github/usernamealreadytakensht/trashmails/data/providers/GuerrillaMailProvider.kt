@@ -78,7 +78,8 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             id = n,
             provider = provider,
             address = json.optString("email_addr").ifBlank { "$n@$DOMAIN" },
-            token = json.optString("sid_token").takeIf { it.isNotBlank() },
+            // The session token is cached in memory only: it expires within the hour and is not a secret worth keeping.
+            token = null,
             createdAt = json.optLong("email_timestamp").takeIf { it > 0 }?.let { it * 1000 }
                 ?: System.currentTimeMillis(),
         )

@@ -35,7 +35,8 @@ class InboxStore(context: Context) {
             id = o.getString("id"),
             provider = provider,
             address = o.getString("address"),
-            token = o.optString("token").takeIf { it.isNotBlank() },
+            // Guerrilla Mail session tokens were stored by earlier versions; they are useless after an hour.
+            token = o.optString("token").takeIf { it.isNotBlank() && provider != Provider.GUERRILLA_MAIL },
             createdAt = o.optLong("createdAt"),
             expiresAt = if (o.has("expiresAt") && !o.isNull("expiresAt")) o.getLong("expiresAt") else null,
         )

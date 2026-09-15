@@ -26,7 +26,8 @@ class GuerrillaMailProviderTest {
 
         assertEquals("trashmailsprobe", created.id)
         assertEquals("trashmailsprobe@guerrillamailblock.com", created.address)
-        assertEquals("hv15ugm7f1tcfi7i1vsb399aci", created.token)
+        // The session token stays in memory; nothing secret-looking is persisted for a public inbox.
+        assertNull(created.token)
         assertEquals(1_789_415_079_000L, created.createdAt)
         assertTrue(http.urls().single().contains("email_user=trashmailsprobe"))
     }
