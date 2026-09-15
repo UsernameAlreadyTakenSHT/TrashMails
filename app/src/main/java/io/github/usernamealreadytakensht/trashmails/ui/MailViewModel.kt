@@ -158,12 +158,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         forgetOldInboxes()
     }
 
+    /** How many addresses "forget after [hours] hours" would drop right now (the open one never is). */
+    fun countOlderThan(hours: Int): Int = if (hours <= 0) 0 else inboxes.count { isOld(it, hours * 3_600_000L) }
+
+    private fun isOld(inbox: Inbox, maxAgeMs: Long) =
+        inbox.createdAt < System.currentTimeMillis() - maxAgeMs && inbox.key != currentInbox()?.key
+
     /** Drops the addresses older than the setting allows (local list only; the open one is kept). */
     private fun forgetOldInboxes() {
         val maxAge = settings.forgetAfterMs ?: return
-        val cutoff = System.currentTimeMillis() - maxAge
-        val open = currentInbox()?.key
-        val kept = inboxes.filter { it.createdAt >= cutoff || it.key == open }
+        val kept = inboxes.filterNot { isOld(it, maxAge) }
         if (kept.size != inboxes.size) {
             inboxes = kept
             unread = unread.filterKeys { key -> kept.any { it.key == key } }

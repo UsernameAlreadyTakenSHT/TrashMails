@@ -100,6 +100,7 @@ private fun App(vm: MailViewModel) {
         Screen.Settings -> SettingsScreen(
             settings = vm.settings,
             onChange = vm::updateSettings,
+            countOlderThan = vm::countOlderThan,
             onBack = vm::back,
         )
         is Screen.InboxDetail -> InboxScreen(

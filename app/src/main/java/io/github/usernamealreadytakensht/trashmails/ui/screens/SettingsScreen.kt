@@ -40,8 +40,29 @@ import io.github.usernamealreadytakensht.trashmails.data.Settings
 fun SettingsScreen(
     settings: Settings,
     onChange: (Settings) -> Unit,
+    countOlderThan: (Int) -> Int,
     onBack: () -> Unit,
 ) {
+    /** A "forget after" choice (hours) that would drop addresses right now, awaiting confirmation; 0 = none. */
+    var pendingForget by rememberSaveable { mutableStateOf(0) }
+    if (pendingForget > 0) {
+        val hours = pendingForget
+        val dropped = countOlderThan(hours)
+        AlertDialog(
+            onDismissRequest = { pendingForget = 0 },
+            title = { Text("Forget $dropped ${if (dropped == 1) "address" else "addresses"} now?") },
+            text = {
+                Text(
+                    "$dropped of your addresses ${if (dropped == 1) "is" else "are"} already older than that and will be " +
+                        "dropped from the list as soon as you confirm. Nothing changes on the providers' side.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { pendingForget = 0; onChange(settings.copy(forgetAfterHours = hours)) }) { Text("Forget") }
+            },
+            dismissButton = { TextButton(onClick = { pendingForget = 0 }) { Text("Cancel") } },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,11 +111,14 @@ fun SettingsScreen(
             HorizontalDivider()
             ChoiceRow(
                 title = "Forget old addresses",
-                description = "Addresses older than this are dropped from the list when the app opens. Nothing is " +
-                    "deleted on the provider's side; most inboxes have expired there long before.",
+                description = "Addresses older than this are dropped from the list right away, then each time the app " +
+                    "comes to the front. Nothing is deleted on the provider's side; most inboxes have expired there long before.",
                 choices = Settings.FORGET_AFTER,
                 selected = settings.forgetAfterHours,
-                onSelect = { onChange(settings.copy(forgetAfterHours = it)) },
+                onSelect = { hours ->
+                    val dropped = countOlderThan(hours)
+                    if (dropped > 0) pendingForget = hours else onChange(settings.copy(forgetAfterHours = hours))
+                },
             )
             HorizontalDivider()
             SettingRow(
