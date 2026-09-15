@@ -76,8 +76,11 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
         return cache.update(inbox.key) { known -> (fresh + known).distinctBy { it.id } }
     }
 
-    override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent =
-        MailContent(html = summary.html, text = summary.text)
+    override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
+        // The bodies travel with the summary; after a process death only the cached copy has them.
+        val m = summary.takeIf { it.html != null || it.text != null } ?: cache.load(inbox.key).firstOrNull { it.id == summary.id } ?: summary
+        return MailContent(html = m.html, text = m.text)
+    }
 
     override val canDeleteMessages get() = true
     override val deletesLocally get() = true

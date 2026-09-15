@@ -81,6 +81,8 @@ class TempmailLolProviderTest {
         val list = provider.listMessages(inbox)
 
         assertEquals("Hello there", provider.getMessage(inbox, list[1]).text)
+        // Only the id is known after a process death: the body comes from the cache.
+        assertEquals("<p>Hello <b>there</b></p>", provider.getMessage(inbox, MailSummary(list[1].id, "", "", 0)).html)
         assertTrue(provider.deleteMessage(inbox, list[1]))
         assertEquals(listOf("Second"), cache.load(inbox.key).map(MailSummary::subject))
 
