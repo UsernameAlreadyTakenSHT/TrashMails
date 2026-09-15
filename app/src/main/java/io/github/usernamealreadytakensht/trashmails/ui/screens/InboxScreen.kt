@@ -50,6 +50,7 @@ fun InboxScreen(
     loading: Boolean,
     loaded: Boolean,
     refreshHint: String,
+    staleHint: String?,
     error: String?,
     notice: String?,
     onBack: () -> Unit,
@@ -85,6 +86,12 @@ fun InboxScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
+            if (staleHint != null) Text(
+                staleHint,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
             if (messages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(

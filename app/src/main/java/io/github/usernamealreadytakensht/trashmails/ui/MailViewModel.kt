@@ -107,6 +107,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private var lastFetchAt = 0L
     /** The error the polling loop itself last reported, so a recovery only clears that one. */
     private var lastFetchError: String? = null
+    /** Why the last listing of the open inbox failed, or null; shown inline under the list. */
+    var listProblem by mutableStateOf<String?>(null)
+        private set
+
+    /** One line for the inbox screen when the listing is stale: the problem and when it last worked. */
+    val staleHint: String?
+        get() = listProblem?.let { problem ->
+            val key = currentInbox()?.key
+            if (key != null && key == lastFetchKey && lastFetchAt > 0) "$problem · last updated ${formatDate(lastFetchAt)}" else problem
+        }
 
     private fun providerFor(inbox: Inbox) = providers.getValue(inbox.provider)
 
@@ -132,12 +142,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      * call) and returns its result, or null after storing a user-facing [error]. Cancellation
      * propagates untouched so a job cancelled by navigation leaves no trace.
      */
-    private suspend inline fun <T> attempt(fallback: String, crossinline block: suspend () -> T): T? = try {
+    private suspend inline fun <T> attempt(
+        fallback: String,
+        noinline onError: (String) -> Unit = { error = it },
+        crossinline block: suspend () -> T,
+    ): T? = try {
         withContext(Dispatchers.Default) { block() }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        error = e.userMessage(fallback)
+        onError(e.userMessage(fallback))
         null
     }
 
@@ -252,6 +266,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.InboxDetail(inbox)
         messages = emptyList()
         listLoaded = false
+        listProblem = null
         error = null
         startPolling(inbox)
     }
@@ -312,7 +327,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         notice = null
         when (val s = screen) {
             is Screen.Message -> { cancelMessage(); screen = Screen.InboxDetail(s.inbox) }
-            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList() }
+            is Screen.InboxDetail -> { stopPolling(); screen = Screen.Home; messages = emptyList(); listProblem = null }
             Screen.Settings -> screen = Screen.Home
             Screen.Home -> Unit
         }
@@ -327,25 +342,31 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 return
             }
         }
-        startPolling(inbox)
+        startPolling(inbox, manual = true)
     }
 
-    private suspend fun fetch(inbox: Inbox) {
+    /**
+     * Lists [inbox]. A failure of a [manual] refresh is an error (snackbar); a failure of the
+     * automatic loop only sets [listProblem], shown inline, so a flaky connection does not raise a
+     * snackbar at every tick.
+     */
+    private suspend fun fetch(inbox: Inbox, manual: Boolean) {
         listLoading = true
-        val before = error
-        val list = attempt("Could not load the inbox") { providerFor(inbox).listMessages(inbox) }
+        val list = attempt("Could not refresh", onError = { msg ->
+            listProblem = msg
+            if (manual) { error = msg; lastFetchError = msg }
+        }) { providerFor(inbox).listMessages(inbox) }
         if (list != null) {
             lastFetchKey = inbox.key
             lastFetchAt = System.currentTimeMillis()
             messages = list
             setUnread(inbox, list)
             listLoaded = true
+            listProblem = null
             // A listing that works again clears the listing error it had set — not somebody else's
             // (a message that failed to load keeps saying why while polling goes on behind it).
             if (error != null && error == lastFetchError) error = null
             lastFetchError = null
-        } else if (error != before) {
-            lastFetchError = error
         }
         listLoading = false
     }
@@ -355,7 +376,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      * in manual mode). With [immediate] false the first listing waits for the interval to elapse
      * since the last one of the same inbox.
      */
-    private fun startPolling(inbox: Inbox, immediate: Boolean = true) {
+    private fun startPolling(inbox: Inbox, immediate: Boolean = true, manual: Boolean = false) {
         stopPolling()
         if (!foreground) return
         val interval = settings.pollIntervalMs
@@ -365,8 +386,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 val wait = lastFetchAt + interval - System.currentTimeMillis()
                 if (wait > 0) delay(wait)
             }
+            var first = true
             while (isActive) {
-                fetch(inbox)
+                fetch(inbox, manual = manual && first)
+                first = false
                 if (!settings.autoRefresh) return@launch
                 delay(interval)
             }
