@@ -177,7 +177,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     fun onForeground() {
         foreground = true
         forgetOldInboxes()
-        currentInbox()?.let { startPolling(it, immediate = false) }
+        currentInbox()?.let { startPolling(it, immediate = providerFor(it).refreshOnForeground) }
     }
 
     /** Screen off or another app in front: no request until [onForeground]. */
@@ -411,6 +411,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             // Once the server no longer lists a deleted id, it needs no hiding.
             hidden?.retainAll { id -> list.any { it.id == id } }
             lastFetch[inbox.key] = System.currentTimeMillis() to shown
+            providerFor(inbox).takeNotice()?.let { notice = it }
             if (shown != messages) messages = shown
             setUnread(inbox, shown)
             listLoaded = true

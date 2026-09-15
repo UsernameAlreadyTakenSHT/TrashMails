@@ -125,6 +125,12 @@ interface MailProvider {
 
     /** The app forgets [inbox]: anything the provider kept for it locally goes too. */
     fun forgetInbox(inbox: Inbox) {}
+
+    /** One line the user should hear about what the last call did (an address restored), handed over once. */
+    fun takeNotice(): String? = null
+
+    /** Coming back to the foreground lists the open inbox at once, when staying reachable depends on it. */
+    val refreshOnForeground: Boolean get() = false
 }
 
 open class ProviderException(message: String, cause: Throwable? = null) : Exception(message, cause)

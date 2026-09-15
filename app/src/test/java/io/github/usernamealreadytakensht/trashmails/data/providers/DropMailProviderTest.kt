@@ -98,8 +98,12 @@ class DropMailProviderTest {
         assertTrue(http.calls.last().query.contains("session(id: \"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97\")"))
 
         // The session lapsed: the address is restored into a new one and the cached mail is what is listed.
+        assertNull(p.takeNotice())
         val second = p.listMessages(inbox)
         assertEquals(first, second)
+        // The user hears once that the session had lapsed.
+        assertTrue(p.takeNotice()!!.contains("lapsed"))
+        assertNull(p.takeNotice())
         val restore = http.calls.last().query
         assertTrue(restore.contains("sessionId: \"U2Vzc2lvbjpuZXc\""))
         assertTrue(restore.contains("mailAddress: \"alxtherxj@10mail.org\""))

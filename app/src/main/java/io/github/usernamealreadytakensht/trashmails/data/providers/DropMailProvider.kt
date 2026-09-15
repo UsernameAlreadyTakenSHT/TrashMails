@@ -49,6 +49,15 @@ class DropMailProvider(
         const val MAIL_FIELDS = "id receivedAt fromAddr headerFrom headerSubject text html"
     }
 
+    /** Set when a lapsed session was replaced, for the user to hear once. */
+    @Volatile
+    private var pendingNotice: String? = null
+
+    override fun takeNotice(): String? = pendingNotice.also { pendingNotice = null }
+
+    /** A refresh extends the session: the sooner after coming back, the fewer lapses. */
+    override val refreshOnForeground get() = true
+
     /** Domain ids by name, fetched once per process: the API documents them as never changing. */
     @Volatile
     private var domainIds: Map<String, String>? = null
@@ -142,12 +151,12 @@ class DropMailProvider(
                 reply.data("restoreAddress")?.optString("restoreKey")?.takeIf { it.isNotBlank() }?.let { saveSession(inbox, sessionId, it) }
             }
         }
-        if (restored.data("restoreAddress") != null) return
-        when (restored.errorMessage()) {
+        if (restored.data("restoreAddress") == null) when (restored.errorMessage()) {
             "bad_signature" -> throw ProviderException("DropMail.me rejected the restore key of ${inbox.address}: the address cannot be brought back")
-            "already_in_use" -> adoptSession(inbox)
+            "already_in_use" -> { adoptSession(inbox); return }
             else -> fail(restored, "DropMail.me could not restore the address")
         }
+        pendingNotice = "The DropMail.me session had lapsed: the address is live again, but mail sent meanwhile bounced"
     }
 
     private suspend fun adoptSession(inbox: Inbox) {
