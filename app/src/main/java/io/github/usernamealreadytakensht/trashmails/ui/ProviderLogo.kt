@@ -25,6 +25,7 @@ fun providerLogo(provider: Provider): Int = when (provider) {
     Provider.BURNER_KIWI -> R.drawable.logo_burner_kiwi
     Provider.MAILDROP -> R.drawable.logo_maildrop
     Provider.TEMPMAIL_LOL -> R.drawable.logo_tempmail_lol
+    Provider.DROPMAIL -> R.drawable.logo_dropmail
 }
 
 /**

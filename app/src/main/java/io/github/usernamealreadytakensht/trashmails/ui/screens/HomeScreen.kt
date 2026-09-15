@@ -251,8 +251,8 @@ private fun CreateInboxDialog(
     var provider by rememberSaveable { mutableStateOf(defaultProvider.takeIf { it.available } ?: Provider.INBOX_KITTEN) }
     var name by rememberSaveable { mutableStateOf("") }
     var infoFor by rememberSaveable { mutableStateOf<Provider?>(null) }
-    // The provider's choices start from its defaults every time: first domain, no scrambling.
-    var domain by rememberSaveable(provider) { mutableStateOf(provider.domains.firstOrNull()) }
+    // The provider's choices start from its defaults every time: first domain (or random), no scrambling.
+    var domain by rememberSaveable(provider) { mutableStateOf(provider.domains.firstOrNull()?.takeUnless { provider.randomDomain }) }
     var scramble by rememberSaveable(provider) { mutableStateOf(false) }
     var noSubdomain by rememberSaveable(provider) { mutableStateOf(false) }
     val options = CreateOptions(
@@ -299,8 +299,10 @@ private fun CreateInboxDialog(
                 QuotaLine(status)
                 // Only while there is something to say: the dialog height is fixed, so no space is reserved.
                 if (creating || error != null) CreateStatusLine(creating, error)
-                // The name field carries the domain choice, when there is one, at its end.
-                OutlinedTextField(
+                // The name field carries the domain choice as its suffix; a provider that names the
+                // address itself shows the domain field alone (or a disabled name field when there
+                // is nothing to choose at all).
+                if (provider.allowsCustomName || provider.domains.isEmpty()) OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     enabled = provider.allowsCustomName && !creating,
@@ -323,6 +325,7 @@ private fun CreateInboxDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                else DomainField(provider, options.domain, onDomain = { domain = it }, enabled = !creating)
                 if (provider.scrambleAvailable) OptionCheckbox(
                     title = "Scrambled address",
                     description = "A random alias instead of the name, which anyone could guess.",
@@ -349,7 +352,7 @@ private fun CreateInboxDialog(
 
 /** The domain chosen, at the end of the name field ("@domain ▾"), opening the list of choices on tap. */
 @Composable
-private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String) -> Unit, enabled: Boolean) {
+private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String?) -> Unit, enabled: Boolean) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     Box {
         Row(
@@ -358,16 +361,43 @@ private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String) -
                 .padding(start = 4.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("@${domain ?: provider.domains.first()}", style = MaterialTheme.typography.bodyMedium)
+            Text(domain?.let { "@$it" } ?: "Random", style = MaterialTheme.typography.bodyMedium)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         DomainChoices(provider, menuOpen, onDismiss = { menuOpen = false }, onDomain = onDomain)
     }
 }
 
+/** The domain as a field of its own, for a provider that picks the name itself. */
 @Composable
-private fun DomainChoices(provider: Provider, open: Boolean, onDismiss: () -> Unit, onDomain: (String) -> Unit) {
+private fun DomainField(provider: Provider, domain: String?, onDomain: (String?) -> Unit, enabled: Boolean) {
+    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    Box {
+        OutlinedTextField(
+            value = domain?.let { "@$it" } ?: "Random",
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            singleLine = true,
+            label = { Text("Domain") },
+            supportingText = { Text("The name is the service's own. Random picks one of ${provider.label}'s permanent domains.") },
+            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // The field itself is read-only; a transparent layer on top opens the menu on tap.
+        Box(
+            Modifier
+                .matchParentSize()
+                .clickable(enabled = enabled, onClickLabel = "Choose the domain") { menuOpen = true },
+        )
+        DomainChoices(provider, menuOpen, onDismiss = { menuOpen = false }, onDomain = onDomain)
+    }
+}
+
+@Composable
+private fun DomainChoices(provider: Provider, open: Boolean, onDismiss: () -> Unit, onDomain: (String?) -> Unit) {
     DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        if (provider.randomDomain) DropdownMenuItem(text = { Text("Random") }, onClick = { onDomain(null); onDismiss() })
         provider.domains.forEach { d ->
             DropdownMenuItem(text = { Text("@$d") }, onClick = { onDomain(d); onDismiss() })
         }

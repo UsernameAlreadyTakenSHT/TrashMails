@@ -17,6 +17,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ReadStore
+import io.github.usernamealreadytakensht.trashmails.data.SharedPrefs
 import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
 import io.github.usernamealreadytakensht.trashmails.data.providers.allProviders
@@ -46,7 +47,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val quota = CreationQuota(app)
     private val settingsStore = SettingsStore(app)
     private val readStore = ReadStore(app)
-    private val providers: Map<Provider, MailProvider> = allProviders(cache = MessageCache(app))
+    private val providers: Map<Provider, MailProvider> = allProviders(cache = MessageCache(app), prefsFor = { SharedPrefs(app, it) })
 
     var inboxes by mutableStateOf(store.load())
         private set

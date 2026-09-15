@@ -69,6 +69,18 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         ),
         warning = null,
     )
+    Provider.DROPMAIL -> RetentionInfo(
+        mails = listOf(
+            "Kept on the server only while the session lives (see below); the copy fetched into this app is the one that lasts.",
+            "No deletion on the server: deleting a message removes the local copy and hides it.",
+        ),
+        account = listOf(
+            "The address lives in a session that ends 10 minutes after its last access: every refresh extends it, and once it has lapsed the app restores the same address into a new session at the next refresh. Mail sent while it has lapsed bounces.",
+            "Removing the address forgets it and its messages in this app; DropMail keeps nothing that can be opened again.",
+            "When creating: the domain (random among the permanent ones unless chosen). The name is always the server's.",
+        ),
+        warning = null,
+    )
     Provider.MAILDROP -> RetentionInfo(
         mails = listOf(
             "Kept on the server: 10 messages max (oldest are overwritten).",

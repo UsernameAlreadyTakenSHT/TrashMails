@@ -14,6 +14,7 @@ Android app to create and read disposable email inboxes from free providers:
 | <img src="app/src/main/res/drawable-nodpi/logo_guerrilla_mail.png" height="56"> | [Guerrilla Mail](https://www.guerrillamail.com) | `name@<domain>` (custom or random name; 11 interchangeable domains, optional scrambled alias) | Public inbox, emails kept 1 hour, manual deletion | [in the terms](https://www.guerrillamail.com/tos) | closed |
 | <img src="app/src/main/res/drawable-nodpi/logo_mail_tm.png" height="56"> | [mail.tm](https://mail.tm) | `name@<domain>` (custom or random name, domain chosen by mail.tm) | **Private** inbox (account + password), emails kept 7 days, manual deletion, account deleted on removal | [policy](https://mail.tm/en/privacy/) | closed |
 | <img src="app/src/main/res/drawable-nodpi/logo_tempmail_lol.png" height="56"> | [tempmail.lol](https://tempmail.lol) | `prefix` + random suffix `@<random domain>` (subdomain optional) | **Private** inbox (token), alive 1 hour; emails are handed over once and kept in the app | [policy](https://tempmail.lol/privacy) | closed ([clients](https://github.com/tempmail-lol) are open) |
+| <img src="app/src/main/res/drawable-nodpi/logo_dropmail.png" height="56"> | [DropMail.me](https://dropmail.me) | random name `@<domain>` (random among 15 permanent domains, or chosen) | **Private** inbox (restore key); lives in a 10-minute session that every refresh extends, restored automatically once lapsed (mail sent meanwhile bounces); emails kept in the app | [policy](https://dropmail.me/privacypolicy.html) | closed |
 
 In the app, providers are grouped by source availability (open source first) and each one has an
 (i) button showing its retention rules and links to the website, privacy policy and repository.
@@ -84,5 +85,6 @@ app/src/main/java/io/github/usernamealreadytakensht/trashmails/
 - Burner Kiwi: `GET /api/v2/inbox`, `GET /api/v2/inbox/{id}/messages` with `X-Burner-Key`
 - Maildrop: GraphQL at `https://api.maildrop.cc/graphql` (`inbox`, `message`, `delete`)
 - tempmail.lol: `POST /v2/inbox/create` (`prefix`, `subdomain`), `GET /v2/inbox?token=` — the reply consumes the emails, so the app keeps them locally
+- DropMail.me: `POST /api/token/generate` (a free `af_` token per device), then GraphQL at `https://dropmail.me/api/graphql/<token>` (`domains`, `introduceSession`, `session`, `restoreAddress`, `sessions`) — mail lives with the 10-minute session, so the app keeps it locally
 
 Provider logos are the services' own artwork (SVGs rasterized, or their favicon/wordmark when that is all they publish).

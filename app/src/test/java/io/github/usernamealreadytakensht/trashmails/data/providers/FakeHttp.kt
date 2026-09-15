@@ -4,17 +4,25 @@ import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 
 /**
- * Canned HTTP for the provider tests: each rule matches a substring of the URL (first match wins,
- * in registration order) and answers with a sequence of steps — a fixture, or an HTTP error —
+ * Canned HTTP for the provider tests: each rule matches a substring of the URL — or, for the GraphQL
+ * providers whose calls all share one URL, of the request body — (first match wins, in registration
+ * order) and answers with a sequence of steps — a fixture, or an HTTP error —
  * the last step repeating forever. Every call is recorded.
  */
 class FakeHttp : HttpApi {
     data class Call(val method: String, val url: String, val body: String?, val headers: Map<String, String>)
 
     val calls = mutableListOf<Call>()
-    private val rules = mutableListOf<Pair<String, ArrayDeque<() -> String>>>()
+    private val rules = mutableListOf<Rule>()
 
-    fun on(urlPart: String, vararg steps: () -> String) = apply { rules += urlPart to ArrayDeque(steps.toList()) }
+    private class Rule(val part: String, val inBody: Boolean, val steps: ArrayDeque<() -> String>) {
+        fun matches(url: String, body: String?) = if (inBody) body?.contains(part) == true else url.contains(part)
+    }
+
+    fun on(urlPart: String, vararg steps: () -> String) = apply { rules += Rule(urlPart, inBody = false, ArrayDeque(steps.toList())) }
+
+    /** A rule matched against the request body (a GraphQL query, say) rather than the URL. */
+    fun onBody(bodyPart: String, vararg steps: () -> String) = apply { rules += Rule(bodyPart, inBody = true, ArrayDeque(steps.toList())) }
 
     override suspend fun get(url: String, headers: Map<String, String>) = answer("GET", url, null, headers)
     override suspend fun postJson(url: String, body: String, headers: Map<String, String>) = answer("POST", url, body, headers)
@@ -22,7 +30,7 @@ class FakeHttp : HttpApi {
 
     private fun answer(method: String, url: String, body: String?, headers: Map<String, String>): String {
         calls += Call(method, url, body, headers)
-        val steps = rules.firstOrNull { url.contains(it.first) }?.second ?: error("No canned reply for $method $url")
+        val steps = rules.firstOrNull { it.matches(url, body) }?.steps ?: error("No canned reply for $method $url ${body.orEmpty()}")
         val step = if (steps.size > 1) steps.removeFirst() else steps.first()
         return step()
     }

@@ -20,6 +20,8 @@ enum class Provider(
     val nameIsPrefix: Boolean = false,
     /** Addresses normally sit on a random subdomain; the user may ask for the bare domain instead. */
     val subdomainOptional: Boolean = false,
+    /** The service picks among [domains] unless one is chosen: "Random" comes first and is the default. */
+    val randomDomain: Boolean = false,
 ) {
     // Declaration order is the display order within a group (open source first, unavailable last).
     INBOX_KITTEN("Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten"),
@@ -40,6 +42,15 @@ enum class Provider(
         "tempmail.lol", "random domain", true, 20, "https://tempmail.lol", "https://tempmail.lol/privacy",
         nameIsPrefix = true,
         subdomainOptional = true,
+    ),
+    // Only the permanent domains are listed; the rotating ones the API also offers expire within a year.
+    DROPMAIL(
+        "DropMail.me", "random domain", false, 20, "https://dropmail.me", "https://dropmail.me/privacypolicy.html",
+        domains = listOf(
+            "dropmail.me", "10mail.org", "10mail.info", "10mail.xyz", "emlhub.com", "emlpro.com", "emltmp.com", "freeml.net",
+            "mailpwr.com", "mailtowin.com", "maximail.fyi", "maximail.vip", "mimimail.me", "spymail.one", "yomail.info",
+        ),
+        randomDomain = true,
     ),
     BURNER_KIWI(
         "Burner Kiwi", "random address", false, 5, "https://burner.kiwi",
@@ -65,7 +76,7 @@ enum class Provider(
  */
 data class CreateOptions(val domain: String? = null, val scramble: Boolean = false, val noSubdomain: Boolean = false)
 
-/** A temporary inbox. [id] is the mailbox name (kitten/guerrilla/maildrop), the account id (burner/mail.tm) or the address (tempmail.lol). */
+/** A temporary inbox. [id] is the mailbox name (kitten/guerrilla/maildrop), the account id (burner/mail.tm) or the address (tempmail.lol/dropmail). */
 data class Inbox(
     val id: String,
     val provider: Provider,
