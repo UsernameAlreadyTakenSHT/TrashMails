@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.CreationQuota
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.InboxStore
@@ -215,7 +216,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         quotas = Provider.entries.associateWith { quota.status(it) }
     }
 
-    fun createInbox(provider: Provider, name: String?) {
+    fun createInbox(provider: Provider, name: String?, options: CreateOptions = CreateOptions()) {
         provider.unavailableReason?.let { createError = "${provider.label} is unavailable: $it"; return }
         val status = quota.status(provider)
         if (status.exhausted) {
@@ -227,7 +228,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         createError = null
         createJob = viewModelScope.launch {
             val inbox = attempt("Could not create the address", onError = { createError = it }) {
-                providers.getValue(provider).createInbox(name)
+                providers.getValue(provider).createInbox(name, options)
             }
             creating = false
             inbox ?: return@launch

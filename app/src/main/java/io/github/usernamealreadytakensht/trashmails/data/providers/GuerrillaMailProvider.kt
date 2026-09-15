@@ -2,6 +2,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -27,7 +28,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
 
     private companion object {
         const val BASE = "https://api.guerrillamail.com/ajax.php"
-        const val DOMAIN = "guerrillamailblock.com"
+        const val DOMAIN = "guerrillamail.com"
     }
 
     /** Session token per inbox name. */
@@ -71,13 +72,20 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
         return block(attach(inbox.id).getString("sid_token"))
     }
 
-    override suspend fun createInbox(name: String?): Inbox {
+    /**
+     * The inbox is the name ([Inbox.id]); the address shown is that name — or, with
+     * [CreateOptions.scramble], the alias the API hands out for it — at the chosen domain: every
+     * Guerrilla Mail domain delivers to the same inbox, the API always answers with its own.
+     */
+    override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
         val n = sanitizeName(name) ?: randomName()
         val json = attach(n)
+        val domain = options.domain?.takeIf { it in provider.domains } ?: DOMAIN
+        val local = json.optString("alias").takeIf { options.scramble && it.isNotBlank() } ?: n
         return Inbox(
             id = n,
             provider = provider,
-            address = json.optString("email_addr").ifBlank { "$n@$DOMAIN" },
+            address = "$local@$domain",
             // The session token is cached in memory only: it expires within the hour and is not a secret worth keeping.
             token = null,
             createdAt = json.optLong("email_timestamp").takeIf { it > 0 }?.let { it * 1000 }
@@ -85,9 +93,12 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
         )
     }
 
-    /** A listing reply that really is [inbox]'s: it carries `list`, and `email` (when present) matches. */
+    /**
+     * A listing reply that really is [inbox]'s: it carries `list`, and the name in `email` (when
+     * present) is the inbox name — the domain is the API's own, the address may be an alias.
+     */
     private fun JSONObject.isListingOf(inbox: Inbox): Boolean =
-        has("list") && optString("email").let { it.isBlank() || it.equals(inbox.address, ignoreCase = true) }
+        has("list") && optString("email").substringBefore('@').let { it.isBlank() || it.equals(inbox.id, ignoreCase = true) }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
         val json = withSid(inbox) { sid ->

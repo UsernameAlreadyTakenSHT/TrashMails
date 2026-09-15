@@ -1,5 +1,6 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
@@ -25,7 +26,8 @@ class GuerrillaMailProviderTest {
         val created = GuerrillaMailProvider(http).createInbox("Trash Mails Probe!")
 
         assertEquals("trashmailsprobe", created.id)
-        assertEquals("trashmailsprobe@guerrillamailblock.com", created.address)
+        // The default domain, not the one the API answers with (guerrillamailblock.com): they are interchangeable.
+        assertEquals("trashmailsprobe@guerrillamail.com", created.address)
         // The session token stays in memory; nothing secret-looking is persisted for a public inbox.
         assertNull(created.token)
         assertEquals(1_789_415_079_000L, created.createdAt)
@@ -132,5 +134,36 @@ class GuerrillaMailSessionTest {
         val provider = GuerrillaMailProvider(http)
         assertTrue(provider.deleteMessage(inbox, MailSummary("812345", "", "", 0)))
         assertTrue(!provider.deleteMessage(inbox, MailSummary("999", "", "", 0)))
+    }
+}
+
+class GuerrillaMailOptionsTest {
+    private fun provider() = GuerrillaMailProvider(FakeHttp().on("f=set_email_user", fixture("guerrilla_set_email_user")))
+
+    @Test
+    fun theChosenDomainAndTheScrambledAliasMakeTheAddress_theNameStaysTheInbox() = runBlocking {
+        val plain = provider().createInbox("trashmailsprobe", CreateOptions(domain = "grr.la"))
+        assertEquals("trashmailsprobe", plain.id)
+        assertEquals("trashmailsprobe@grr.la", plain.address)
+
+        val scrambled = provider().createInbox("trashmailsprobe", CreateOptions(domain = "sharklasers.com", scramble = true))
+        assertEquals("trashmailsprobe", scrambled.id)
+        assertEquals("yr9gkh+16k4zxphkfs9yfjfmzc1tpw2@sharklasers.com", scrambled.address)
+    }
+
+    @Test
+    fun anUnknownDomainFallsBackToTheDefault() = runBlocking {
+        assertTrue(provider().createInbox(null, CreateOptions(domain = "evil.example")).address.endsWith("@guerrillamail.com"))
+    }
+
+    @Test
+    fun aListingIsRecognisedWhateverTheDomainOrAlias() = runBlocking {
+        val http = FakeHttp()
+            .on("f=set_email_user", fixture("guerrilla_set_email_user"))
+            .on("f=get_email_list", fixture("guerrilla_list"))
+        val scrambled = Inbox("trashmailsprobe", Provider.GUERRILLA_MAIL, "yr9gkh+16k4zxphkfs9yfjfmzc1tpw2@grr.la", createdAt = 1L)
+        assertEquals(2, GuerrillaMailProvider(http).listMessages(scrambled).size)
+        // Recognised on the first try: no re-attach because the domain differs.
+        assertEquals(2, http.calls.size)
     }
 }

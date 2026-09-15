@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -74,7 +75,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
         }
     }
 
-    override suspend fun createInbox(name: String?): Inbox {
+    override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
         val local = sanitizeName(name) ?: randomName()
         val address = "$local@${activeDomain()}"
         val password = randomName(24)

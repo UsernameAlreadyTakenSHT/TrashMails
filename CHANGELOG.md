@@ -1,3 +1,11 @@
+## Unreleased
+
+### Added
+- **Guerrilla Mail: the domain and a scrambled address can be chosen when creating** — tap the domain at the end of the name field to pick one of the eleven (they all reach the same inbox; a lesser-known one gets past sites that refuse guerrillamail.com) and, optionally, a scrambled address: a random alias of the inbox handed out instead of its name, which anyone could otherwise open. Nothing is remembered: every creation starts from guerrillamail.com, unscrambled.
+
+### Changed
+- **The create dialog keeps one height whatever the provider** (its options sit inline: the domain at the end of the name field, checkboxes below), so nothing jumps or scrolls when switching providers.
+
 ## v0.4.0 — 2026-09-15
 
 A second five-angle review of 0.3.0 (bugs, security, performance, UX, code quality) and the fixes

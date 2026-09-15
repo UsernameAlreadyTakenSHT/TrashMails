@@ -24,12 +24,15 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.sp
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.CreationQuota
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.Provider
@@ -101,7 +107,7 @@ fun HomeScreen(
     onOpen: (Inbox) -> Unit,
     onDelete: (Inbox, Boolean) -> Unit,
     canDeleteOnServer: (Inbox) -> Boolean,
-    onCreate: (Provider, String?) -> Unit,
+    onCreate: (Provider, String?, CreateOptions) -> Unit,
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var toDelete by rememberSaveable { mutableStateOf<String?>(null) }
@@ -240,13 +246,23 @@ private fun CreateInboxDialog(
     quotas: Map<Provider, CreationQuota.Status>,
     defaultProvider: Provider,
     onDismiss: () -> Unit,
-    onCreate: (Provider, String?) -> Unit,
+    onCreate: (Provider, String?, CreateOptions) -> Unit,
 ) {
     var provider by rememberSaveable { mutableStateOf(defaultProvider.takeIf { it.available } ?: Provider.INBOX_KITTEN) }
     var name by rememberSaveable { mutableStateOf("") }
     var infoFor by rememberSaveable { mutableStateOf<Provider?>(null) }
+    // The provider's choices start from its defaults every time: first domain, no scrambling.
+    var domain by rememberSaveable(provider) { mutableStateOf(provider.domains.firstOrNull()) }
+    var scramble by rememberSaveable(provider) { mutableStateOf(false) }
+    val options = CreateOptions(
+        domain = domain?.takeIf { it in provider.domains },
+        scramble = scramble && provider.scrambleAvailable,
+    )
     val status = quotas[provider]
     val exhausted = status?.exhausted == true
+    // One height whatever the provider shows under the list (helper text, options), so switching
+    // providers does not make the dialog jump; the dialog clamps it on small screens.
+    val contentHeight = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * 0.75f).toDp() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -256,7 +272,7 @@ private fun CreateInboxDialog(
         title = { Text("New address") },
         text = {
             Column(
-                Modifier.verticalScroll(rememberScrollState()),
+                Modifier.height(contentHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -279,38 +295,93 @@ private fun CreateInboxDialog(
                     }
                 }
                 QuotaLine(status)
-                CreateStatusLine(creating, error)
+                // Only while there is something to say: the dialog height is fixed, so no space is reserved.
+                if (creating || error != null) CreateStatusLine(creating, error)
+                // The name field carries the domain choice, when there is one, at its end.
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     enabled = provider.allowsCustomName && !creating,
                     singleLine = true,
-                    label = { Text("Name (optional)") },
-                    placeholder = { Text("Random if left empty") },
-                    suffix = { Text(provider.fieldSuffix) },
+                    label = { Text("Name") },
+                    suffix = { if (provider.domains.isEmpty()) Text(provider.fieldSuffix) },
+                    // A suffix only shows once the field is focused or filled: the domain choice must stay in sight.
+                    trailingIcon = if (provider.domains.isEmpty()) null else {
+                        { DomainMenu(provider, options.domain, onDomain = { domain = it }, enabled = !creating) }
+                    },
                     supportingText = {
                         Text(
                             when {
                                 !provider.allowsCustomName -> "Address is generated by the service."
-                                provider.fieldSuffix == "@…" -> "Letters, digits, dots, underscores and dashes · ${provider.domainHint}"
-                                else -> "Letters, digits, dots, underscores and dashes"
+                                provider.fieldSuffix == "@…" -> "Optional · letters, digits, . _ - · ${provider.domainHint}"
+                                else -> "Optional · letters, digits, . _ -"
                             }
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                )
+                if (provider.scrambleAvailable) OptionCheckbox(
+                    title = "Scrambled address",
+                    description = "A random alias instead of the name, which anyone could guess.",
+                    checked = options.scramble, onChange = { scramble = it }, enabled = !creating,
                 )
             }
         },
         confirmButton = {
             TextButton(
                 enabled = !creating && !exhausted,
-                onClick = { onCreate(provider, name.takeIf { provider.allowsCustomName && it.isNotBlank() }) },
+                onClick = { onCreate(provider, name.takeIf { provider.allowsCustomName && it.isNotBlank() }, options) },
             ) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 
     infoFor?.let { p -> ProviderInfoDialog(p, onDismiss = { infoFor = null }) }
+}
+
+/** The domain chosen, at the end of the name field ("@domain ▾"), opening the list of choices on tap. */
+@Composable
+private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String) -> Unit, enabled: Boolean) {
+    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .clickable(enabled = enabled, onClickLabel = "Choose the domain") { menuOpen = true }
+                .padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("@${domain ?: provider.domains.first()}", style = MaterialTheme.typography.bodyMedium)
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DomainChoices(provider, menuOpen, onDismiss = { menuOpen = false }, onDomain = onDomain)
+    }
+}
+
+@Composable
+private fun DomainChoices(provider: Provider, open: Boolean, onDismiss: () -> Unit, onDomain: (String) -> Unit) {
+    DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        provider.domains.forEach { d ->
+            DropdownMenuItem(text = { Text("@$d") }, onClick = { onDomain(d); onDismiss() })
+        }
+    }
+}
+
+/** A checkbox with its title and one line of explanation; the whole row toggles it. */
+@Composable
+private fun OptionCheckbox(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Column(Modifier.padding(start = 8.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 /** Providers grouped under a section title; inside a group the unavailable ones sink to the bottom. */
@@ -488,11 +559,10 @@ private fun ProviderRow(
     }
 }
 
-/** Always present (min height) so the dialog does not jump: creation in progress, or why it failed. */
+/** Creation in progress, or why it failed (shown only then; the dialog height is fixed anyway). */
 @Composable
 private fun CreateStatusLine(creating: Boolean, error: String?) {
     Row(
-        Modifier.heightIn(min = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -510,7 +580,7 @@ private fun CreateStatusLine(creating: Boolean, error: String?) {
     }
 }
 
-/** One always-present line so the dialog height never changes: remaining quota or time to next slot. */
+/** Remaining quota, or the time to the next slot once it is used up. */
 @Composable
 private fun QuotaLine(status: CreationQuota.Status?) {
     status ?: return

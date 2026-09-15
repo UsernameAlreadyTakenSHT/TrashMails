@@ -2,6 +2,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -31,7 +32,7 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
         return json
     }
 
-    override suspend fun createInbox(name: String?): Inbox {
+    override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
         // Inbox creation is a GET (POST returns 405).
         val json = unwrap(http.get(BASE))
         val result = json.getJSONObject("result")

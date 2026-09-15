@@ -2,6 +2,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
+import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -25,7 +26,7 @@ class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
         const val DOMAIN = "inboxkitten.com"
     }
 
-    override suspend fun createInbox(name: String?): Inbox {
+    override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
         val n = sanitizeName(name) ?: randomName()
         return Inbox(id = n, provider = provider, address = "$n@$DOMAIN")
     }

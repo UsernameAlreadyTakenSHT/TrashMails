@@ -12,12 +12,24 @@ enum class Provider(
     val sourceUrl: String? = null,
     /** Set when the service cannot deliver mail anymore: the provider is listed but cannot be picked. */
     val unavailableReason: String? = null,
+    /** Domains the user may pick for a new address; empty when there is no choice. */
+    val domains: List<String> = emptyList(),
+    /** The service can hand out a scrambled alias of the inbox name, harder to guess than the name. */
+    val scrambleAvailable: Boolean = false,
 ) {
     // Declaration order is the display order within a group (open source first, unavailable last).
     INBOX_KITTEN("Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten"),
     MAILDROP("Maildrop", "@maildrop.cc", true, 20, "https://maildrop.cc", "https://maildrop.cc/privacy/", sourceUrl = "https://github.com/m242/maildrop"),
     // Guerrilla Mail has no separate policy page: the privacy section lives in its terms.
-    GUERRILLA_MAIL("Guerrilla Mail", "@guerrillamailblock.com", true, 20, "https://www.guerrillamail.com", "https://www.guerrillamail.com/tos"),
+    GUERRILLA_MAIL(
+        "Guerrilla Mail", "@guerrillamail.com", true, 20, "https://www.guerrillamail.com", "https://www.guerrillamail.com/tos",
+        // Every domain delivers to the same inbox name; the choice is only what the address looks like.
+        domains = listOf(
+            "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrillamail.biz", "guerrillamail.de",
+            "guerrillamail.info", "guerrillamailblock.com", "grr.la", "sharklasers.com", "spam4.me", "pokemail.net",
+        ),
+        scrambleAvailable = true,
+    ),
     MAIL_TM("mail.tm", "domain chosen by mail.tm", true, 10, "https://mail.tm", "https://mail.tm/en/privacy/"),
     BURNER_KIWI(
         "Burner Kiwi", "random address", false, 5, "https://burner.kiwi",
@@ -36,6 +48,12 @@ enum class Provider(
     val fieldSuffix: String get() = if (domainHint.startsWith("@")) domainHint else "@…"
     val openSource: Boolean get() = sourceUrl != null
 }
+
+/**
+ * Choices offered when creating an address, for the providers that support them
+ * ([Provider.domains], [Provider.scrambleAvailable]); ignored by the others.
+ */
+data class CreateOptions(val domain: String? = null, val scramble: Boolean = false)
 
 /** A temporary inbox. [id] is the mailbox name (kitten/guerrilla/maildrop) or the account id (burner/mail.tm). */
 data class Inbox(
@@ -67,7 +85,7 @@ data class MailContent(val html: String?, val text: String?)
 
 interface MailProvider {
     val provider: Provider
-    suspend fun createInbox(name: String?): Inbox
+    suspend fun createInbox(name: String?, options: CreateOptions = CreateOptions()): Inbox
     suspend fun listMessages(inbox: Inbox): List<MailSummary>
     suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent
     /** Whether [deleteMessage] does anything on the server; the delete button is only shown when true. */

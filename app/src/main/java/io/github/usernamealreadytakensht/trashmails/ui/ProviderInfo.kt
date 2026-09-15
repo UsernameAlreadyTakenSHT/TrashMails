@@ -31,8 +31,9 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
         account = listOf(
             "There is no account: the inbox only exists by its name.",
             "Removing the address only forgets it in this app.",
+            "When creating: the domain (all are aliases of the same inbox) and a scrambled address (a random alias instead of the name).",
         ),
-        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
+        warning = "Public inbox: anyone who knows the name can read the emails while they exist. A scrambled address keeps the name out of sight.",
     )
     Provider.MAIL_TM -> RetentionInfo(
         mails = listOf(
