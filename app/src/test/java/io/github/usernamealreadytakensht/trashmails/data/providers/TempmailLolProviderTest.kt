@@ -88,3 +88,29 @@ class TempmailLolProviderTest {
         assertTrue(cache.load(inbox.key).isEmpty())
     }
 }
+
+class TempmailLolCacheRaceTest {
+    private val inbox = Inbox(
+        id = "trashmailsprobe90a610@imagesthere.com", provider = Provider.TEMPMAIL_LOL,
+        address = "trashmailsprobe90a610@imagesthere.com", token = "2l9prthcmfgqlebbcgg1hj4pp2cxl52ntlerdc",
+    )
+
+    @Test
+    fun aDeletionDuringAListing_isNotUndoneByTheMerge() = runBlocking {
+        val cache = MessageCache(MemoryPrefs())
+        lateinit var provider: TempmailLolProvider
+        lateinit var victim: MailSummary
+        // The second reply (a third message) arrives after the user deleted one the first had brought.
+        val third = """{"emails":[{"from":"carol@example.com","subject":"Third","body":"Late","html":null,"date":1789415400000}],"expired":false}"""
+        val http = FakeHttp().on(
+            "/inbox?token=",
+            fixture("tempmaillol_inbox"),
+            { runBlocking { provider.deleteMessage(inbox, victim) }; third },
+        )
+        provider = TempmailLolProvider(http, cache)
+        victim = provider.listMessages(inbox)[1]
+
+        assertEquals(listOf("Third", "Second"), provider.listMessages(inbox).map(MailSummary::subject))
+        assertEquals(listOf("Third", "Second"), cache.load(inbox.key).map(MailSummary::subject))
+    }
+}

@@ -191,3 +191,28 @@ class DropMailProviderTest {
         assertEquals("", prefs.getString("session:${inbox.key}"))
     }
 }
+
+class DropMailCacheRaceTest {
+    private val inbox = Inbox(id = "alxtherxj@10mail.org", provider = Provider.DROPMAIL, address = "alxtherxj@10mail.org", token = "k")
+
+    @Test
+    fun aDeletionDuringAListing_isNotUndoneByTheMerge_andStaysHidden() = runBlocking {
+        val cache = MessageCache(MemoryPrefs())
+        val prefs = MemoryPrefs()
+        prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")
+        lateinit var provider: DropMailProvider
+        lateinit var victim: MailSummary
+        // The server still lists the message the user deletes while the second listing is in flight.
+        val http = FakeHttp().on("/api/token/generate", body("""{"token":"af_x"}""")).onBody(
+            "session(id:",
+            fixture("dropmail_session"),
+            { runBlocking { provider.deleteMessage(inbox, victim) }; fixture("dropmail_session")() },
+        )
+        provider = DropMailProvider(http, cache, prefs)
+        victim = provider.listMessages(inbox)[1]
+
+        assertEquals(listOf("Second"), provider.listMessages(inbox).map(MailSummary::subject))
+        assertEquals(listOf("Second"), provider.listMessages(inbox).map(MailSummary::subject))
+        assertEquals(listOf("Second"), cache.load(inbox.key).map(MailSummary::subject))
+    }
+}

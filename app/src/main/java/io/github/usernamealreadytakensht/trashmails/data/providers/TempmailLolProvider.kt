@@ -55,11 +55,10 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
         val token = inbox.token ?: throw ProviderException("Missing token")
-        val known = cache.load(inbox.key)
         val json = JSONObject(http.get("$BASE/inbox?token=${URLEncoder.encode(token, "UTF-8")}"))
         val arr = json.optJSONArray("emails")
         // An expired inbox (or a reply without emails) only means nothing new: what was received stays.
-        if (arr == null || arr.length() == 0) return known
+        if (arr == null || arr.length() == 0) return cache.load(inbox.key)
         val fresh = (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)
             val from = m.textOrEmpty("from")
@@ -73,9 +72,8 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
                 from = from, subject = subject, date = date, html = html, text = text,
             )
         }
-        val merged = (fresh + known).distinctBy { it.id }.sortedByDescending { it.date }
-        cache.save(inbox.key, merged)
-        return merged
+        // Merged under the cache lock: a deletion running meanwhile must not be undone.
+        return cache.update(inbox.key) { known -> (fresh + known).distinctBy { it.id } }
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent =
@@ -85,7 +83,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
     override val deletesLocally get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        cache.save(inbox.key, cache.load(inbox.key).filterNot { it.id == summary.id })
+        cache.update(inbox.key) { known -> known.filterNot { it.id == summary.id } }
         return true
     }
 

@@ -7,7 +7,9 @@ import org.json.JSONObject
 /**
  * Messages kept on the device for the providers that hand them over once (tempmail.lol consumes
  * an email when it is fetched). Per inbox key: the summaries with their bodies, newest first,
- * bounded in count and body size. SharedPreferences, JSON.
+ * bounded in count and body size. SharedPreferences, JSON. Writes go through [update], one at a
+ * time: a listing merging what it fetched and a deletion can run at once (leaving a message
+ * screen starts a poll), and neither must undo the other.
  */
 class MessageCache(private val prefs: Prefs) {
     constructor(context: Context) : this(SharedPrefs(context, "messages"))
@@ -17,11 +19,23 @@ class MessageCache(private val prefs: Prefs) {
         return (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
     }
 
-    fun save(inboxKey: String, messages: List<MailSummary>) {
-        val arr = JSONArray()
-        messages.sortedByDescending { it.date }.take(MAX_MESSAGES).forEach { arr.put(toJson(it)) }
-        prefs.put(inboxKey to arr.toString())
+    /**
+     * Replaces the list of [inboxKey] with what [change] makes of the current one, atomically with
+     * respect to other updates, and returns what is now kept (newest first, bounded). Nothing is
+     * written when [change] changes nothing.
+     */
+    fun update(inboxKey: String, change: (List<MailSummary>) -> List<MailSummary>): List<MailSummary> = synchronized(lock) {
+        val current = load(inboxKey)
+        val next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
+        if (next != current) {
+            val arr = JSONArray()
+            next.forEach { arr.put(toJson(it)) }
+            prefs.put(inboxKey to arr.toString())
+        }
+        next
     }
+
+    private val lock = Any()
 
     fun clear(inboxKey: String) = prefs.put(inboxKey to "")
 

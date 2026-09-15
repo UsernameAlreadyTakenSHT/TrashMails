@@ -69,7 +69,6 @@ class DropMailProvider(
     }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val known = cache.load(inbox.key)
         val (sessionId, restoreKey) = loadSession(inbox)
         val json = sessionId?.let { graphql("{ session(id: ${quote(it)}) { id mails { $MAIL_FIELDS } } }") }
         val session = json?.data("session")
@@ -78,13 +77,12 @@ class DropMailProvider(
             // holds no mail yet — what was received before stays in the cache.
             if (json != null && json.errorCode() != "SESSION_NOT_FOUND") fail(json, "DropMail.me could not list the inbox")
             restore(inbox, restoreKey)
-            return known
+            return cache.load(inbox.key)
         }
         val arr = session.optJSONArray("mails") ?: fail(json, "DropMail.me could not list the inbox")
-        val deleted = tombstones(inbox)
         val fresh = (0 until arr.length()).mapNotNull { i ->
             val m = arr.optJSONObject(i) ?: return@mapNotNull null
-            val id = m.optString("id").takeIf { it.isNotBlank() && it !in deleted } ?: return@mapNotNull null
+            val id = m.text("id") ?: return@mapNotNull null
             MailSummary(
                 id = id,
                 from = m.text("headerFrom") ?: m.textOrEmpty("fromAddr"),
@@ -94,9 +92,12 @@ class DropMailProvider(
                 text = m.text("text"),
             )
         }
-        val merged = (fresh + known).distinctBy { it.id }.sortedByDescending { it.date }
-        cache.save(inbox.key, merged)
-        return merged
+        // Merged under the cache lock, tombstones read there too: a deletion running meanwhile
+        // (leaving a message screen starts a poll) must not be undone by this listing.
+        return cache.update(inbox.key) { known ->
+            val deleted = tombstones(inbox)
+            (fresh + known).distinctBy { it.id }.filterNot { it.id in deleted }
+        }
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
@@ -109,11 +110,12 @@ class DropMailProvider(
     override val deletesLocally get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        cache.save(inbox.key, cache.load(inbox.key).filterNot { it.id == summary.id })
-        // The server keeps the message as long as the session lives: remembered so a fetch does not bring it back.
+        // The server keeps the message as long as the session lives: remembered (before the copy
+        // goes, so a listing in flight sees it) so that no fetch brings it back.
         val arr = JSONArray()
         (tombstones(inbox) + summary.id).takeLast(MAX_TOMBSTONES).forEach { arr.put(it) }
         prefs.put(deletedKey(inbox) to arr.toString())
+        cache.update(inbox.key) { known -> known.filterNot { it.id == summary.id } }
         return true
     }
 
