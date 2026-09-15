@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -357,11 +359,18 @@ private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String?) 
     Box {
         Row(
             Modifier
-                .clickable(enabled = enabled, onClickLabel = "Choose the domain") { menuOpen = true }
+                .clickable(enabled = enabled, onClickLabel = "Choose the domain", role = Role.DropdownList) { menuOpen = true }
+                .semantics { contentDescription = "Domain ${domain ?: "random"}" }
                 .padding(start = 4.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(domain?.let { "@$it" } ?: "Random", style = MaterialTheme.typography.bodyMedium)
+            // Capped so a long domain cannot squeeze the name input out of the field (the menu shows it whole).
+            Text(
+                domain?.let { "@$it" } ?: "Random",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 140.dp),
+            )
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         DomainChoices(provider, menuOpen, onDismiss = { menuOpen = false }, onDomain = onDomain)
@@ -382,13 +391,14 @@ private fun DomainField(provider: Provider, domain: String?, onDomain: (String?)
             label = { Text("Domain") },
             supportingText = { Text("The name is the service's own. Random picks one of ${provider.label}'s permanent domains.") },
             trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
+            // The read-only field is only the look; the layer on top is the one control screen readers see.
+            modifier = Modifier.fillMaxWidth().clearAndSetSemantics {},
         )
-        // The field itself is read-only; a transparent layer on top opens the menu on tap.
         Box(
             Modifier
                 .matchParentSize()
-                .clickable(enabled = enabled, onClickLabel = "Choose the domain") { menuOpen = true },
+                .semantics { contentDescription = "Domain ${domain ?: "random"}" }
+                .clickable(enabled = enabled, onClickLabel = "Choose the domain", role = Role.DropdownList) { menuOpen = true },
         )
         DomainChoices(provider, menuOpen, onDismiss = { menuOpen = false }, onDomain = onDomain)
     }
