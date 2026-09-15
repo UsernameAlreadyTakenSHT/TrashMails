@@ -225,6 +225,8 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                 }
                 webViewClient = MailWebViewClient(onLink)
                 settings.javaScriptEnabled = false
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
                 settings.builtInZoomControls = true
@@ -243,21 +245,31 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
 }
 
 /**
- * A tapped link leaves the app ([onLink]); nothing ever navigates inside the mail view. While
- * [blockRemote], every resource request gets an empty reply — a second guard behind
- * WebSettings.blockNetworkLoads. Requests are intercepted off the main thread, hence the flag
- * kept here rather than read from the WebView.
+ * A link the user tapped leaves the app ([onLink]); nothing ever navigates inside the mail view:
+ * - navigations the user did not tap (`<meta http-equiv="refresh">`, frames) are dropped, so a
+ *   sender cannot open a page — and reveal the reader's IP — merely by being read;
+ * - a navigation of the mail frame itself, or anything but a GET, gets an empty reply whatever
+ *   the image policy: Android does not route POST navigations (forms) through
+ *   [shouldOverrideUrlLoading], so a form could otherwise load the sender's page in-app;
+ * - while [blockRemote], every other resource request gets an empty reply too — a second guard
+ *   behind WebSettings.blockNetworkLoads.
+ * Requests are intercepted off the main thread, hence the flag kept here rather than read from
+ * the WebView.
  */
 private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClient() {
     @Volatile var blockRemote = true
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-        onLink(request.url)
+        if (request.isForMainFrame && request.hasGesture()) onLink(request.url)
         return true
     }
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-        if (blockRemote) WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))) else null
+        if (blockRemote || request.isForMainFrame || request.method != "GET") EMPTY() else null
+
+    private companion object {
+        val EMPTY = { WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))) }
+    }
 }
 
 /**
