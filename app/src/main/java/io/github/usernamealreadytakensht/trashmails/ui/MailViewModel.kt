@@ -82,12 +82,20 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Creation quota per provider (rolling 24 h), refreshed by [refreshQuota]. */
     var quotas by mutableStateOf(Provider.entries.associateWith { quota.status(it) })
         private set
-    /** Unread messages per inbox at its last listing, for the badge on the home screen. */
-    var unread by mutableStateOf<Map<String, Int>>(emptyMap())
+    private val readState = readStore.load()
+    /** Unread messages per inbox at its last listing, for the badge on the home screen (persisted). */
+    var unread by mutableStateOf(readState.unread)
         private set
     /** Ids of the messages opened at least once, per inbox key. */
-    var read by mutableStateOf(readStore.load())
+    var read by mutableStateOf(readState.read)
         private set
+
+    private fun saveRead() = readStore.save(ReadStore.State(read, unread))
+
+    private fun setUnread(inbox: Inbox, list: List<MailSummary>) {
+        unread = unread + (inbox.key to countUnread(inbox, list))
+        saveRead()
+    }
 
     /** Set between onStart and onStop of the activity: polling only runs while true. */
     private var foreground = false
@@ -172,7 +180,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             inboxes = kept
             unread = unread.filterKeys { key -> kept.any { it.key == key } }
             read = read.filterKeys { key -> kept.any { it.key == key } }
-            readStore.save(read)
+            saveRead()
             store.save(kept)
         }
     }
@@ -236,7 +244,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         inboxes = inboxes.filterNot { it.key == inbox.key }
         unread = unread - inbox.key
         read = read - inbox.key
-        readStore.save(read)
+        saveRead()
         store.save(inboxes)
     }
 
@@ -256,8 +264,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.Message(inbox, summary)
         if (!isRead(inbox, summary)) {
             read = read + (inbox.key to read[inbox.key].orEmpty() + summary.id)
-            readStore.save(read)
-            unread = unread + (inbox.key to countUnread(inbox, messages))
+            setUnread(inbox, messages)
         }
         messageJob?.cancel()
         content = null
@@ -292,7 +299,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 else -> {
                     if (currentInbox()?.key == inbox.key) {
                         messages = messages.filterNot { it.id == summary.id }
-                        unread = unread + (inbox.key to countUnread(inbox, messages))
+                        setUnread(inbox, messages)
                     }
                     notice = "Message deleted"
                 }
@@ -331,7 +338,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             lastFetchKey = inbox.key
             lastFetchAt = System.currentTimeMillis()
             messages = list
-            unread = unread + (inbox.key to countUnread(inbox, list))
+            setUnread(inbox, list)
             listLoaded = true
             // A listing that works again clears the listing error it had set — not somebody else's
             // (a message that failed to load keeps saying why while polling goes on behind it).

@@ -56,6 +56,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -203,7 +205,9 @@ private fun InboxCard(
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ProviderLogo(inbox.provider, 28.dp)
-                    unread?.takeIf { it > 0 }?.let { Badge { Text("$it") } }
+                    unread?.takeIf { it > 0 }?.let { n ->
+                        Badge(Modifier.clearAndSetSemantics { contentDescription = "$n unread" }) { Text("$n") }
+                    }
                     formatRemaining(inbox.expiresAt)?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
