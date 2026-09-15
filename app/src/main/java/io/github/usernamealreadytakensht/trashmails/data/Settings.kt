@@ -40,8 +40,8 @@ data class Settings(
 }
 
 /** Persistence of [Settings] (SharedPreferences). */
-class SettingsStore(context: Context) {
-    private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+class SettingsStore(private val prefs: Prefs) {
+    constructor(context: Context) : this(SharedPrefs(context, "settings"))
 
     fun load(): Settings {
         val defaults = Settings()
@@ -52,25 +52,25 @@ class SettingsStore(context: Context) {
             pollIntervalSec = prefs.getInt(POLL_INTERVAL, defaults.pollIntervalSec),
             blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
             forgetAfterHours = prefs.getInt(FORGET_AFTER, defaults.forgetAfterHours),
-            theme = prefs.getString(THEME, null) ?: defaults.theme,
-            lastProvider = prefs.getString(LAST_PROVIDER, null)?.let { name -> Provider.entries.firstOrNull { it.name == name } }
+            theme = prefs.getString(THEME) ?: defaults.theme,
+            lastProvider = prefs.getString(LAST_PROVIDER)?.let { name -> Provider.entries.firstOrNull { it.name == name } }
                 ?: defaults.lastProvider,
             copyOnCreate = prefs.getBoolean(COPY_ON_CREATE, defaults.copyOnCreate),
         )
     }
 
     fun save(s: Settings) {
-        prefs.edit()
-            .putBoolean(RENDER_HTML, s.renderHtml)
-            .putBoolean(LOAD_IMAGES, s.loadImages)
-            .putBoolean(CONFIRM_LINKS, s.confirmLinks)
-            .putInt(POLL_INTERVAL, s.pollIntervalSec)
-            .putBoolean(BLOCK_SCREENSHOTS, s.blockScreenshots)
-            .putInt(FORGET_AFTER, s.forgetAfterHours)
-            .putString(THEME, s.theme)
-            .putString(LAST_PROVIDER, s.lastProvider.name)
-            .putBoolean(COPY_ON_CREATE, s.copyOnCreate)
-            .apply()
+        prefs.put(
+            RENDER_HTML to s.renderHtml,
+            LOAD_IMAGES to s.loadImages,
+            CONFIRM_LINKS to s.confirmLinks,
+            POLL_INTERVAL to s.pollIntervalSec,
+            BLOCK_SCREENSHOTS to s.blockScreenshots,
+            FORGET_AFTER to s.forgetAfterHours,
+            THEME to s.theme,
+            LAST_PROVIDER to s.lastProvider.name,
+            COPY_ON_CREATE to s.copyOnCreate,
+        )
     }
 
     private companion object {

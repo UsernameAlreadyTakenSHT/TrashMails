@@ -5,11 +5,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Persistence of created inboxes (SharedPreferences, JSON). */
-class InboxStore(context: Context) {
-    private val prefs = context.getSharedPreferences("inboxes", Context.MODE_PRIVATE)
+class InboxStore(private val prefs: Prefs) {
+    constructor(context: Context) : this(SharedPrefs(context, "inboxes"))
 
     fun load(): List<Inbox> {
-        val raw = prefs.getString(KEY, null) ?: return emptyList()
+        val raw = prefs.getString(KEY) ?: return emptyList()
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
         // One malformed entry is dropped on its own, not the whole list with it.
         return (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
@@ -18,7 +18,7 @@ class InboxStore(context: Context) {
     fun save(inboxes: List<Inbox>) {
         val arr = JSONArray()
         inboxes.forEach { arr.put(toJson(it)) }
-        prefs.edit().putString(KEY, arr.toString()).apply()
+        prefs.put(KEY to arr.toString())
     }
 
     private fun toJson(i: Inbox) = JSONObject()

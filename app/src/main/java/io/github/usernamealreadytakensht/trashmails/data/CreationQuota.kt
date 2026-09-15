@@ -6,8 +6,8 @@ import android.content.Context
  * Courtesy rate limit on inbox creation: at most [Provider.dailyLimit] per rolling 24 h window,
  * tracked locally (creation timestamps in SharedPreferences). Not a security measure.
  */
-class CreationQuota(context: Context) {
-    private val prefs = context.getSharedPreferences("creation_quota", Context.MODE_PRIVATE)
+class CreationQuota(private val prefs: Prefs) {
+    constructor(context: Context) : this(SharedPrefs(context, "creation_quota"))
 
     data class Status(val used: Int, val limit: Int, val nextSlotAt: Long?) {
         val remaining: Int get() = (limit - used).coerceAtLeast(0)
@@ -25,7 +25,7 @@ class CreationQuota(context: Context) {
     }
 
     private fun recent(provider: Provider, now: Long): List<Long> =
-        prefs.getString(provider.name, null)
+        prefs.getString(provider.name)
             ?.split(',')
             ?.mapNotNull { it.toLongOrNull() }
             // A stamp in the future (clock set back) would block creation for up to a day: dropped.
@@ -33,7 +33,7 @@ class CreationQuota(context: Context) {
             .orEmpty()
 
     private fun save(provider: Provider, stamps: List<Long>) {
-        prefs.edit().putString(provider.name, stamps.joinToString(",")).apply()
+        prefs.put(provider.name to stamps.joinToString(","))
     }
 
     private companion object {
