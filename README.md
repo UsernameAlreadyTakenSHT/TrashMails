@@ -38,8 +38,10 @@ service comes back.
 - Retention rules, website, privacy policy and source repository of each provider behind an (i) button (retention shown again when removing an address)
 - Courtesy creation quota per rolling 24 h: 20 per provider (10 for mail.tm, 5 for Burner Kiwi)
 
-No backend, no tracking: the app only talks to the providers' public APIs. The only "account" is the
-one mail.tm requires (a random password kept on the device, excluded from Android's cloud backup: the app opts out of backup altogether).
+No backend, no tracking: the app only talks to the providers' public APIs. What stays on the device, in the
+app's private storage and excluded from Android backup (the app opts out altogether): the mail.tm account
+password, the tempmail.lol inbox tokens, the DropMail.me device token and restore keys, and the emails of
+the providers that keep none (tempmail.lol, DropMail.me), bodies included. Removing an address drops all of it.
 
 ## Build
 
