@@ -141,6 +141,9 @@ fun MessageScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(summary.from.ifBlank { "(unknown sender)" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                summary.to?.let {
+                    Text("to $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text(
                     "${formatDate(summary.date)} · ${provider.label}",
                     style = MaterialTheme.typography.labelSmall,

@@ -102,6 +102,8 @@ data class MailSummary(
     val text: String? = null,
     /** Opaque provider data needed to load the body (e.g. Mailgun key/region). */
     val ref: Map<String, String> = emptyMap(),
+    /** The address the mail was sent to, when it is a variant of the inbox's (a DropMail extended address). */
+    val to: String? = null,
 )
 
 /** A message body. [text] is the provider's plain part, or one derived from [html] by the ViewModel. */

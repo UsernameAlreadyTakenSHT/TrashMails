@@ -95,6 +95,9 @@ class DropMailProviderTest {
         assertEquals("other@example.com", first[0].from)
         assertEquals("<p>Hello <b>there</b></p>", first[1].html)
         assertNull(first[0].html)
+        // The extended address a mail came to is kept; the plain one is not worth repeating.
+        assertEquals("alxtherxj-shop@xk.10mail.org", first[0].to)
+        assertNull(first[1].to)
         assertTrue(http.calls.last().query.contains("session(id: \"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97\")"))
 
         // The session lapsed: the address is restored into a new one and the cached mail is what is listed.

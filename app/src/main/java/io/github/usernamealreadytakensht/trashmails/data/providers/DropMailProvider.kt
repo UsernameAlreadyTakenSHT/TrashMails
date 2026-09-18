@@ -46,7 +46,7 @@ class DropMailProvider(
         const val MAX_TOMBSTONES = 200
         const val KEY_TOKEN = "token"
         const val KEY_TOKEN_EXPIRES = "tokenExpiresAt"
-        const val MAIL_FIELDS = "id receivedAt fromAddr headerFrom headerSubject text html"
+        const val MAIL_FIELDS = "id receivedAt fromAddr headerFrom headerSubject text html toAddr toAddrOrig"
     }
 
     /** Set when a lapsed session was replaced, for the user to hear once. */
@@ -99,6 +99,8 @@ class DropMailProvider(
                 date = parseDate(m.optString("receivedAt")),
                 html = m.text("html"),
                 text = m.text("text"),
+                // Only an extended address is worth showing: the plain one is the inbox itself.
+                to = m.text("toAddrOrig")?.takeIf { it != m.text("toAddr") },
             )
         }
         // Merged under the cache lock, tombstones read there too: a deletion running meanwhile

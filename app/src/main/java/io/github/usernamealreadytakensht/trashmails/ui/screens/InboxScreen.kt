@@ -181,7 +181,7 @@ private fun ExtendedAddressDialog(inbox: Inbox, onDismiss: () -> Unit) {
         title = { Text("Extended address") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Mail sent to this variant lands in the same inbox; the tag tells the sender apart. Handy for a site that refuses the plain address.")
+                Text("Mail sent to this variant lands in the same inbox and shows which variant it came to. Handy for a site that refuses the plain address, or to see who passed it on.")
                 OutlinedTextField(
                     value = tag,
                     // Letters only, as the service allows; the random subdomain part is not editable.

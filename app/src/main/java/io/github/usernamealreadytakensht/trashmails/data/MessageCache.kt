@@ -46,6 +46,7 @@ class MessageCache(private val prefs: Prefs) {
         .put("date", m.date)
         .put("html", m.html?.take(MAX_BODY_CHARS))
         .put("text", m.text?.take(MAX_BODY_CHARS))
+        .put("to", m.to)
 
     private fun fromJson(o: JSONObject) = MailSummary(
         id = o.getString("id"),
@@ -54,6 +55,7 @@ class MessageCache(private val prefs: Prefs) {
         date = o.optLong("date"),
         html = o.text("html"),
         text = o.text("text"),
+        to = o.text("to"),
     )
 
     private companion object {

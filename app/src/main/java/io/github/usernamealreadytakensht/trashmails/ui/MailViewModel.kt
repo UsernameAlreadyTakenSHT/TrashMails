@@ -21,6 +21,7 @@ import io.github.usernamealreadytakensht.trashmails.data.SharedPrefs
 import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
 import io.github.usernamealreadytakensht.trashmails.data.providers.allProviders
+import io.github.usernamealreadytakensht.trashmails.data.text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -472,6 +473,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private fun summaryToJson(s: MailSummary): String = JSONObject()
         .put("id", s.id).put("from", s.from).put("subject", s.subject).put("date", s.date)
         .put("ref", JSONObject(s.ref))
+        .put("to", s.to)
         .toString()
 
     private fun summaryFromJson(json: String): MailSummary? = runCatching {
@@ -480,6 +482,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         MailSummary(
             id = o.getString("id"), from = o.optString("from"), subject = o.optString("subject"), date = o.optLong("date"),
             ref = ref?.keys()?.asSequence()?.associateWith { ref.optString(it) }.orEmpty(),
+            to = o.text("to"),
         )
     }.getOrNull()
 
