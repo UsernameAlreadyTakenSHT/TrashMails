@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -41,6 +42,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -175,7 +178,7 @@ private fun ExtendedAddressDialog(inbox: Inbox, onDismiss: () -> Unit) {
     val domain = inbox.address.substringAfter('@')
     var tag by rememberSaveable { mutableStateOf(randomLetters(6)) }
     val sub = rememberSaveable { randomLetters(4) }
-    val extended = "$local-${tag.ifBlank { "tag" }}@$sub.$domain"
+    val extended = "$local-$tag@$sub.$domain"
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Extended address") },
@@ -188,13 +191,20 @@ private fun ExtendedAddressDialog(inbox: Inbox, onDismiss: () -> Unit) {
                     onValueChange = { tag = it.lowercase().filter { c -> c in 'a'..'z' }.take(20) },
                     singleLine = true,
                     label = { Text("Tag") },
+                    supportingText = { Text("Letters only") },
+                    isError = tag.isBlank(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text(extended, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                if (tag.isNotBlank()) Text(extended, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             }
         },
         confirmButton = {
-            TextButton(onClick = { context.copyToClipboard(extended, "Copied: $extended"); onDismiss() }) { Text("Copy") }
+            TextButton(enabled = tag.isNotBlank(), onClick = { context.copyToClipboard(extended, "Copied: $extended"); onDismiss() }) { Text("Copy") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
