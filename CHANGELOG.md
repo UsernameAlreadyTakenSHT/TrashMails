@@ -1,3 +1,26 @@
+## v0.5.1 — 2026-09-18
+
+A two-angle review of 0.5.0 (provider logic; UX, accessibility and privacy) and the fixes for everything it found.
+
+### Fixed
+- **Every provider error message was mangled** before display: a broken control-character regex (since 0.4.0) replaced the letters p, C, n, t, r, l and s with spaces.
+- **JSON nulls no longer become the word "null"**: on Android, a plain-text DropMail.me or tempmail.lol message ended up with an HTML body of "null" (and "null" senders or subjects), which was then cached. Every provider now reads message fields through null-safe helpers.
+- **DropMail.me could lose an address for good** when a restoration was interrupted (screen left while the reply was in flight): the server had already rotated the restore key. The restoration is no longer cancellable, and a session found still holding the address is adopted with its current key.
+- **A deleted message no longer comes back** when a refresh runs at the same time (leaving a message screen starts one): the cache merge is atomic and DropMail's hidden ids apply to cached entries too.
+- **"Forget old addresses" and removing an address really forget**: cached emails, DropMail sessions and hidden ids are deleted instead of left behind as empty entries.
+- **tempmail.lol messages are readable again after a process death** (the body comes from the local copy).
+- **The locally kept emails are shown when a refresh fails** (offline, DropMail captcha, quota) instead of an empty list.
+- **Creating an existing Guerrilla name again** (another domain, or scrambled) replaces the entry instead of being silently dropped.
+- The delete dialog no longer claims DropMail.me keeps no copy (it does, until the session ends).
+
+### Changed
+- **DropMail.me tells when a lapsed session was replaced** ("mail sent meanwhile bounced"), and the open inbox is refreshed as soon as the app comes back, which keeps the session alive.
+- **The message screen shows which extended address a mail came to** ("to name-tag@sub.domain").
+- **Create dialog**: the provider list scrolls on its own under the pinned name field and options (large fonts no longer hide them); providers cannot be switched while creating; a creation error only shows for the provider it concerns; the status line is announced by screen readers; the domain choosers are single, named controls (TalkBack) and a long domain no longer squeezes the name input.
+- **Extended address dialog**: an empty tag cannot be copied; ASCII keyboard without auto-correction.
+- The local email cache is bounded to 50 messages and 128 KiB per body part, and is not rewritten when a refresh brings nothing.
+- README: what the app keeps on the device (tokens, restore keys, cached emails).
+
 ## v0.5.0 — 2026-09-15
 
 Two more providers and the creation options that came with them.
