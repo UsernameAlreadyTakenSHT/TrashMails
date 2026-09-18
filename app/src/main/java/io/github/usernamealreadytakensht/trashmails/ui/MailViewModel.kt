@@ -239,12 +239,12 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             }
             creating = false
             inbox ?: return@launch
-            if (inboxes.none { it.key == inbox.key }) {
-                inboxes = listOf(inbox) + inboxes
-                store.save(inboxes)
-                quota.record(provider)
-                refreshQuota()
-            }
+            // The same inbox created again (a Guerrilla name on another domain, or scrambled) takes
+            // the place of its earlier entry: what is listed and opened is what was just created.
+            inboxes = listOf(inbox) + inboxes.filterNot { it.key == inbox.key }
+            store.save(inboxes)
+            quota.record(provider)
+            refreshQuota()
             if (settings.lastProvider != provider) updateSettings(settings.copy(lastProvider = provider))
             if (settings.copyOnCreate) getApplication<Application>().copyToClipboard(inbox.address, "Copied: ${inbox.address}")
             openInbox(inbox)
