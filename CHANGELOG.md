@@ -1,3 +1,10 @@
+## v0.5.2 — 2026-09-22
+
+A first app icon.
+
+### Changed
+- **App icon**: a burning envelope replaces the placeholder envelope. Adaptive icon with a monochrome variant for themed icons (Android 13+).
+
 ## v0.5.1 — 2026-09-18
 
 A two-angle review of 0.5.0 (provider logic; UX, accessibility and privacy) and the fixes for everything it found.
