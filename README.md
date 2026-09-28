@@ -1,8 +1,8 @@
 # TrashMails
 
-> Personal project, built with AI assistance (Claude Code). No store release is planned: releases are
-> published here on GitHub only (installable with [Obtainium](https://github.com/ImranR98/Obtainium)).
-> See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
+> Personal project, built with AI assistance (Claude Code). Releases are published here on GitHub
+> (installable with [Obtainium](https://github.com/ImranR98/Obtainium)); an F-Droid submission is in
+> preparation. See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 Android app to create and read disposable email inboxes from free providers:
 
@@ -31,7 +31,7 @@ service comes back.
 
 - Several inboxes side by side, persisted locally
 - Auto-refresh while an inbox is open (every 30 s to 5 min, or manual; paused in the background), manual refresh (max once per 30 s)
-- Emails shown as plain text by default; HTML rendering (JavaScript disabled, remote images blocked unless asked) globally or per message, dark mode
+- Emails shown as plain text by default; HTML rendering (JavaScript disabled, remote images blocked unless asked, no cache or cookies kept) globally or per message, dark mode
 - Links are confirmed before leaving the app (site and full address shown), and only http(s) and mailto links can be opened
 - Settings: render HTML, load remote images, confirm links, auto-refresh interval (30 s to manual), forget old addresses, block screenshots, theme, copy new addresses — privacy ones default to the safe side
 - Copy the address or the message text to the clipboard
