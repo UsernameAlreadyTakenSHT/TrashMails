@@ -90,3 +90,8 @@ app/src/main/java/io/github/usernamealreadytakensht/trashmails/
 - DropMail.me: `POST /api/token/generate` (a free `af_` token per device), then GraphQL at `https://dropmail.me/api/graphql/<token>` (`domains`, `introduceSession`, `session`, `restoreAddress`, `sessions`) — mail lives with the 10-minute session, so the app keeps it locally
 
 Provider logos are the services' own artwork (SVGs rasterized, or their favicon/wordmark when that is all they publish).
+
+## License
+
+[MIT](LICENSE), except the provider logos (`app/src/main/res/drawable-nodpi/logo_*.png`): they are the artwork and
+trademarks of their respective services, used only to identify them, and are not covered by the license.
