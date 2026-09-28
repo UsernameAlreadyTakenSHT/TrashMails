@@ -27,6 +27,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Set before the first frame: the effect below only runs once composed, too late for the recents thumbnail.
+        if (vm.settings.blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContent {
             // FLAG_SECURE follows the setting live, so toggling it needs no restart.
             val blockScreenshots = vm.settings.blockScreenshots
