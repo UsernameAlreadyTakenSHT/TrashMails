@@ -168,6 +168,10 @@ fun MessageScreen(
                     if (hasHtml) BodyBanner("Shown as plain text", "View as HTML") { showHtml = true }
                     PlainBody(text, onLink)
                 }
+                // An HTML mail with no text at all (images only): say so, and offer the HTML view.
+                hasHtml -> {
+                    BodyBanner("No text in this message", "View as HTML") { showHtml = true }
+                }
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("(empty message)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
