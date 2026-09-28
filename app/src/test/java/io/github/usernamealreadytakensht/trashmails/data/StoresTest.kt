@@ -121,3 +121,30 @@ class CreationQuotaTest {
         assertEquals(1, quota.status(Provider.MAIL_TM, now = 2L).used)
     }
 }
+
+class MessageCacheTest {
+    private class CountingPrefs(private val inner: MemoryPrefs = MemoryPrefs()) : Prefs by inner {
+        var puts = 0
+        override fun put(vararg entries: Pair<String, Any>) { puts++; inner.put(*entries) }
+    }
+
+    private val prefs = CountingPrefs()
+    private val cache = MessageCache(prefs)
+    private val long = MailSummary(id = "1", from = "a", subject = "s", date = 1L, html = "x".repeat(200_000))
+
+    @Test
+    fun anOversizedBody_isNotRewrittenAtEveryRefresh() {
+        cache.update("k") { listOf(long) }
+        cache.update("k") { known -> (listOf(long) + known).distinctBy { it.id } }
+        assertEquals(1, prefs.puts)
+    }
+
+    @Test
+    fun aForgottenAddress_isNotWrittenBack() {
+        cache.update("k") { listOf(long) }
+        cache.clear("k")
+        cache.update("k") { listOf(long) }
+        assertTrue(cache.load("k").isEmpty())
+        assertTrue(cache.isForgotten("k"))
+    }
+}

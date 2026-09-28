@@ -25,8 +25,13 @@ class MessageCache(private val prefs: Prefs) {
      * written when [change] changes nothing.
      */
     fun update(inboxKey: String, change: (List<MailSummary>) -> List<MailSummary>): List<MailSummary> = synchronized(lock) {
+        // A reply still in flight when its address was removed must not write it back.
+        if (inboxKey in forgotten) return emptyList()
         val current = load(inboxKey)
+        // Bodies bounded before comparing: a fresh one longer than its stored copy would otherwise
+        // always differ from it and rewrite the whole file at every refresh.
         val next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
+            .map { m -> m.copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
         if (next != current) {
             val arr = JSONArray()
             next.forEach { arr.put(toJson(it)) }
@@ -36,16 +41,24 @@ class MessageCache(private val prefs: Prefs) {
     }
 
     private val lock = Any()
+    /** Addresses removed during this run: nothing is written for them any more. */
+    private val forgotten = mutableSetOf<String>()
 
-    fun clear(inboxKey: String) = prefs.remove(inboxKey)
+    fun clear(inboxKey: String) = synchronized(lock) {
+        forgotten += inboxKey
+        prefs.remove(inboxKey)
+    }
+
+    /** True once [clear] ran for [inboxKey]: whatever a reply still in flight brings is dropped. */
+    fun isForgotten(inboxKey: String): Boolean = synchronized(lock) { inboxKey in forgotten }
 
     private fun toJson(m: MailSummary) = JSONObject()
         .put("id", m.id)
         .put("from", m.from)
         .put("subject", m.subject)
         .put("date", m.date)
-        .put("html", m.html?.take(MAX_BODY_CHARS))
-        .put("text", m.text?.take(MAX_BODY_CHARS))
+        .put("html", m.html)
+        .put("text", m.text)
         .put("to", m.to)
 
     private fun fromJson(o: JSONObject) = MailSummary(
@@ -60,7 +73,7 @@ class MessageCache(private val prefs: Prefs) {
 
     private companion object {
         // A single preference file is parsed whole on first access and rewritten whole on each change:
-        // the bounds keep it at a few megabytes at worst (50 messages of 128 KiB per part).
+        // the bounds cap it per address (50 messages of 128 KiB per part).
         const val MAX_MESSAGES = 50
         const val MAX_BODY_CHARS = 128 * 1024
     }
