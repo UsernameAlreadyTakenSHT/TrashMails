@@ -41,8 +41,8 @@ class DropMailProvider(
         const val TOKEN_URL = "https://dropmail.me/api/token/generate"
         const val GRAPHQL_URL = "https://dropmail.me/api/graphql/"
         const val TOKEN_LIFETIME_MS = 24 * 3_600_000L
-        /** A token is replaced this long before its end, so a listing never runs into a dead one. */
-        const val TOKEN_MARGIN_MS = 10 * 60_000L
+        /** A token is kept to its very end: the sessions opened with it cannot be reached with the next one. */
+        const val TOKEN_MARGIN_MS = 0L
         const val MAX_TOMBSTONES = 200
         const val KEY_TOKEN = "token"
         const val KEY_TOKEN_EXPIRES = "tokenExpiresAt"
@@ -123,10 +123,13 @@ class DropMailProvider(
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
         // The server keeps the message as long as the session lives: remembered (before the copy
         // goes, so a listing in flight sees it) so that no fetch brings it back.
-        val arr = JSONArray()
-        (tombstones(inbox) + summary.id).takeLast(MAX_TOMBSTONES).forEach { arr.put(it) }
-        prefs.put(deletedKey(inbox) to arr.toString())
-        cache.update(inbox.key) { known -> known.filterNot { it.id == summary.id } }
+        // Read and written under the cache lock: two deletions at once must not each drop the other's id.
+        cache.update(inbox.key) { known ->
+            val arr = JSONArray()
+            (tombstones(inbox) + summary.id).takeLast(MAX_TOMBSTONES).forEach { arr.put(it) }
+            prefs.put(deletedKey(inbox) to arr.toString())
+            known.filterNot { it.id == summary.id }
+        }
         return true
     }
 
@@ -240,8 +243,11 @@ class DropMailProvider(
         return o?.optString("session")?.takeIf { it.isNotBlank() } to restoreKey
     }
 
-    private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) =
+    /** Not for an address removed while its restoration was in flight: removing it drops all of it. */
+    private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) {
+        if (cache.isForgotten(inbox.key)) return
         prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", restoreKey).toString())
+    }
 
     /** Ids of the messages deleted locally while the server may still list them. */
     private fun tombstones(inbox: Inbox): List<String> {
