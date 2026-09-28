@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -196,7 +197,8 @@ fun MessageScreen(
         LinkDialog(
             url = link,
             onOpen = { pendingLink = null; openLink(context, Uri.parse(link)) },
-            onCopy = { pendingLink = null; context.copyToClipboard(link, "Link copied") },
+            // Sensitive: a sign-in or reset link carries a token the clipboard preview would show.
+            onCopy = { pendingLink = null; context.copyToClipboard(link, "Link copied", sensitive = true) },
             onDismiss = { pendingLink = null },
         )
     }
@@ -290,6 +292,10 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                 settings.useWideViewPort = true
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false
+                // Loaded images leave nothing behind (no HTTP cache, no cookie) that a sender could
+                // use to tell two disposable addresses are read on the same device.
+                settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                CookieManager.getInstance().setAcceptCookie(false)
             }
         },
         update = { view ->
@@ -301,7 +307,7 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
             }
         },
         // Leaving the message (or switching to plain text) frees the renderer at once.
-        onRelease = { view -> view.stopLoading(); view.destroy() },
+        onRelease = { view -> view.stopLoading(); view.clearCache(true); view.destroy() },
     )
 }
 
