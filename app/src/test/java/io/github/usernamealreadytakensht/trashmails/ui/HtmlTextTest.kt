@@ -47,6 +47,21 @@ class HtmlTextTest {
     }
 
     @Test
+    fun manyAnchorsWithoutHref_stayLinear() {
+        val hostile = "<a>x</a>".repeat(120_000)
+        val start = System.nanoTime()
+        val out = htmlToText(hostile)
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertTrue("took $ms ms", ms < 2_000)
+        assertTrue(out.startsWith("xxx"))
+    }
+
+    @Test
+    fun hrefAfterTheTag_isNotTaken() {
+        assertEquals("a b", htmlToText("<a>a</a> <b href=x>b</b>"))
+    }
+
+    @Test
     fun hugeInputIsTruncatedWithANote() {
         val out = htmlToText("x".repeat(2_000_000))
         assertTrue(out.endsWith("[message truncated]"))

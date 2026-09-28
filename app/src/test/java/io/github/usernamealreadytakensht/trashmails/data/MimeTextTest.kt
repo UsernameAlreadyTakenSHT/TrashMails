@@ -62,4 +62,21 @@ class MimeTextTest {
         assertEquals(MimeText.Parts("", null), MimeText.parse("Subject: x\n\n"))
         assertNull(MimeText.parse("Content-Type: image/png\n\nabc").text)
     }
+
+    @Test
+    fun deepNesting_stopsInsteadOfOverflowing() {
+        val levels = 20_000
+        val raw = StringBuilder()
+        repeat(levels) { raw.append("Content-Type: multipart/mixed; boundary=b${it}x\n\n--b${it}x\n") }
+        raw.append("Content-Type: text/plain\n\nhidden\n")
+        assertEquals(MimeText.Parts(null, null), MimeText.parse(raw.toString()))
+    }
+
+    @Test
+    fun nestingWithinTheLimit_isWalked() {
+        val raw = StringBuilder()
+        repeat(5) { raw.append("Content-Type: multipart/mixed; boundary=b${it}x\n\n--b${it}x\n") }
+        raw.append("Content-Type: text/plain\n\nfound\n")
+        assertEquals("found", MimeText.parse(raw.toString()).text)
+    }
 }

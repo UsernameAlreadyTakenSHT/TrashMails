@@ -105,7 +105,8 @@ private fun spellOutLinks(s: String): String {
         if (close < 0) { out.append(s, from, s.length); break }
         val closeEnd = s.indexOf('>', close).let { if (it < 0) s.length - 1 else it }
         out.append(s, from, start)
-        val href = HREF.find(s, start)?.takeIf { it.range.first < tagEnd }
+        // Searched within the tag only: a search to the end of the text for every anchor is quadratic.
+        val href = HREF.find(s.substring(start, tagEnd))
             ?.let { m -> m.groupValues.drop(1).firstOrNull { it.isNotEmpty() } }
         val text = s.substring(tagEnd + 1, close).replace(TAG, "").trim()
         out.append(

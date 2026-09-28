@@ -12,9 +12,12 @@ object MimeText {
     /** The readable parts of a message; either may be missing. */
     data class Parts(val text: String?, val html: String?)
 
-    fun parse(raw: String): Parts = parseEntity(raw.replace("\r\n", "\n"))
+    fun parse(raw: String): Parts = parseEntity(raw.replace("\r\n", "\n"), 0)
 
-    private fun parseEntity(entity: String): Parts {
+    /** Deepest multipart nesting walked: real mail stays within three or four, a crafted one could nest thousands. */
+    private const val MAX_DEPTH = 8
+
+    private fun parseEntity(entity: String, depth: Int): Parts {
         val split = entity.indexOf("\n\n")
         val (headerBlock, body) = if (split < 0) entity to "" else entity.substring(0, split) to entity.substring(split + 2)
         val headers = unfold(headerBlock)
@@ -22,13 +25,14 @@ object MimeText {
         val mediaType = contentType.substringBefore(';').trim().lowercase()
 
         if (mediaType.startsWith("multipart/")) {
+            if (depth >= MAX_DEPTH) return Parts(null, null)
             val boundary = parameter(contentType, "boundary") ?: return Parts(null, null)
             var text: String? = null
             var html: String? = null
             // A leading newline so the first boundary, at the very start of the body, splits like the others.
             for (part in ("\n" + body).split("\n--$boundary").drop(1)) {
                 if (part.startsWith("--")) break
-                val sub = parseEntity(part.removePrefix("\n"))
+                val sub = parseEntity(part.removePrefix("\n"), depth + 1)
                 text = text ?: sub.text
                 html = html ?: sub.html
             }
