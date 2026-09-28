@@ -21,8 +21,8 @@ android {
         applicationId = "io.github.usernamealreadytakensht.trashmails"
         minSdk = 29
         targetSdk = 37
-        versionCode = 7
-        versionName = "0.5.2"
+        versionCode = 8
+        versionName = "0.5.3"
     }
 
     signingConfigs {

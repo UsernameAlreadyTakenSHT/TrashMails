@@ -1,3 +1,31 @@
+## v0.5.3 — 2026-09-28
+
+A security, reliability and packaging review ahead of the F-Droid submission, and the fixes for what it found.
+
+### Added
+- **MIT license.** The provider logos are excluded: they remain their services' artwork and trademarks.
+- **F-Droid store metadata** (fastlane): title, descriptions, icon, changelog.
+
+### Fixed
+- **A crafted email could crash the app or freeze the message screen**: a Maildrop mail nesting thousands of MIME parts overflowed the stack, and an HTML mail full of links without an address took minutes of CPU to turn into text.
+- **tempmail.lol emails could be lost for good** when the inbox was left while a refresh was in flight: the server drops them as it hands them over. The listing now completes once sent.
+- **A deleted message came back** when its inbox was reopened within the refresh interval.
+- **DropMail.me failed for ten minutes at each daily token renewal**: the token was replaced before its end, leaving the live sessions unreachable. It is now kept to its end.
+- **Refresh survives a clock change**: a clock set back no longer stalls auto-refresh or blocks the manual one.
+- **Guerrilla Mail: the inbox is the name the server settled on**, should it differ from the one typed.
+- **Removing an address really drops all of it**, even with a refresh or a DropMail.me restoration in flight; two DropMail.me deletions at once no longer lose one.
+- **The local email cache is no longer rewritten at every refresh** when a message body is over 128 KiB.
+- An HTML mail without text (images only) offers the HTML view instead of showing "(empty message)".
+- Opening a message after the app was killed no longer resets the unread badge to zero; polling no longer restarts on a message screen when the app comes back.
+
+### Changed
+- **The mail view keeps no cache or cookies** once remote images are loaded, so a sender cannot tell two addresses are read on the same device; WebView metrics and Safe Browsing lookups are off.
+- **No HTTP redirect is followed** (none of the APIs uses one; it would carry tokens to another host), and every request is limited to 60 s.
+- **Backups and device transfers exclude all of the app's storage**, WebView data included.
+- **"Copy link" marks the clip sensitive** (hidden from the clipboard preview on Android 13+).
+- **Block screenshots applies from the first frame** of a cold start.
+- **The build uses the installed JDK** (17 or later) instead of downloading one, and the release APK carries no Google dependency metadata block and no commit info.
+
 ## v0.5.2 — 2026-09-22
 
 A first app icon.
