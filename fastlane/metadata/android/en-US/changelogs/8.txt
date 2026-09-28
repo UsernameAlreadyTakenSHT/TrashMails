@@ -1,0 +1,7 @@
+Security and reliability review before F-Droid:
+- A crafted email can no longer crash the app or freeze the message screen
+- tempmail.lol emails are no longer lost when the inbox is left during a refresh
+- Deleted messages stay gone; refresh survives a clock change
+- DropMail.me no longer breaks for ten minutes at each daily token renewal
+- Mail view keeps no cache or cookies; no redirects followed; nothing in backups
+- MIT license

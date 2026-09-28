@@ -1,0 +1,23 @@
+<p>TrashMails creates and reads disposable email addresses from free temp-mail services, several inboxes side by side, for sign-ups and one-off codes you do not want reaching your real mailbox.</p>
+
+<p><b>Providers</b></p>
+<ul>
+<li><b>Inbox Kitten</b> (open source): public inbox, any name @inboxkitten.com, emails kept about 3 days</li>
+<li><b>Maildrop</b> (open source): public inbox, any name @maildrop.cc</li>
+<li><b>Guerrilla Mail</b>: public inbox on eleven interchangeable domains, optional scrambled alias, emails kept 1 hour</li>
+<li><b>mail.tm</b>: private inbox (account and password), emails kept 7 days</li>
+<li><b>tempmail.lol</b>: private inbox behind a token, alive 1 hour</li>
+<li><b>DropMail.me</b>: private inbox on fifteen permanent domains, extended addresses</li>
+</ul>
+<p>Each provider shows its retention rules, website, privacy policy and source repository in the app.</p>
+
+<p><b>Privacy</b></p>
+<ul>
+<li>No backend, no account, no tracking: the app only talks to the providers' public APIs.</li>
+<li>Emails are shown as plain text by default. HTML rendering has JavaScript disabled and remote images blocked unless you ask, so opening a message tells the sender nothing.</li>
+<li>Links are confirmed before leaving the app, with the site and full address shown; only http(s) and mailto links open.</li>
+<li>Tokens, passwords and kept emails stay in the app's private storage, excluded from backups. Removing an address drops all of it.</li>
+<li>Optional: block screenshots, forget old addresses automatically.</li>
+</ul>
+
+<p>Guerrilla Mail, mail.tm, tempmail.lol and DropMail.me are closed-source services; Inbox Kitten and Maildrop run open-source servers.</p>
