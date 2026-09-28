@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.ui
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -114,9 +115,15 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private var createJob: Job? = null
     private var pollJob: Job? = null
     private var messageJob: Job? = null
-    /** Last successful listing per inbox key: when, and what it returned (reused when the inbox is reopened soon after). */
-    private val lastFetch = mutableMapOf<String, Pair<Long, List<MailSummary>>>()
-    private fun lastFetchAt(inbox: Inbox): Long = lastFetch[inbox.key]?.first ?: 0L
+    /**
+     * A successful listing: when ([at] on the monotonic clock, so that a clock set back stalls no
+     * refresh; [wallAt] for display), and what it returned (reused when the inbox is reopened soon after).
+     */
+    private data class Fetch(val at: Long, val wallAt: Long, val list: List<MailSummary>)
+    /** Last successful listing per inbox key. */
+    private val lastFetch = mutableMapOf<String, Fetch>()
+    private fun lastFetchAt(inbox: Inbox): Long = lastFetch[inbox.key]?.at ?: 0L
+    private fun now() = SystemClock.elapsedRealtime()
     /** Addresses whose server-side deletion is in flight; their cards are dimmed and inert. */
     var deleting by mutableStateOf<Set<String>>(emptySet())
         private set
@@ -132,7 +139,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     val staleHint: String?
         get() = listProblem?.let { problem ->
             val key = currentInbox()?.key
-            val at = key?.let { lastFetch[it]?.first } ?: 0L
+            val at = key?.let { lastFetch[it]?.wallAt } ?: 0L
             if (at > 0) "$problem · last updated ${formatDate(at)}" else problem
         }
 
@@ -172,13 +179,17 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     } catch (e: Exception) {
         onError(e.userMessage(fallback))
         null
+    } catch (e: StackOverflowError) {
+        // A reply nested deeply enough to exhaust the parser (org.json is recursive): a failure, not a crash.
+        onError(fallback)
+        null
     }
 
-    /** The app is visible again: resume polling the open inbox, waiting out the rest of the interval. */
+    /** The app is visible again: resume polling the open inbox (not while a message is read), waiting out the rest of the interval. */
     fun onForeground() {
         foreground = true
         forgetOldInboxes()
-        currentInbox()?.let { startPolling(it, immediate = providerFor(it).refreshOnForeground) }
+        (screen as? Screen.InboxDetail)?.inbox?.let { startPolling(it, immediate = providerFor(it).refreshOnForeground) }
     }
 
     /** Screen off or another app in front: no request until [onForeground]. */
@@ -210,7 +221,11 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         val maxAge = settings.forgetAfterMs ?: return
         val (old, kept) = inboxes.partition { isOld(it, maxAge) }
         if (old.isNotEmpty()) {
-            old.forEach { providerFor(it).forgetInbox(it) }
+            old.forEach {
+                providerFor(it).forgetInbox(it)
+                lastFetch.remove(it.key)
+                pendingDeletes.remove(it.key)
+            }
             inboxes = kept
             unread = unread.filterKeys { key -> kept.any { it.key == key } }
             read = read.filterKeys { key -> kept.any { it.key == key } }
@@ -286,6 +301,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         providerFor(inbox).forgetInbox(inbox)
         inboxes = inboxes.filterNot { it.key == inbox.key }
         lastFetch.remove(inbox.key)
+        pendingDeletes.remove(inbox.key)
         unread = unread - inbox.key
         read = read - inbox.key
         saveRead()
@@ -297,9 +313,11 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         listProblem = null
         error = null
         // Reopened within the refresh interval: show the last listing and wait it out rather than fetch again.
-        val recent = lastFetch[inbox.key]?.takeIf { (at, _) -> System.currentTimeMillis() - at < settings.pollIntervalMs.coerceAtLeast(MANUAL_REFRESH_MIN_MS) }
+        val recent = lastFetch[inbox.key]?.takeIf { now() - it.at < settings.pollIntervalMs.coerceAtLeast(MANUAL_REFRESH_MIN_MS) }
         if (recent != null) {
-            messages = recent.second
+            // Without what was deleted since (or is being deleted).
+            val hidden = pendingDeletes[inbox.key].orEmpty()
+            messages = recent.list.filterNot { it.id in hidden }
             listLoaded = true
             startPolling(inbox, immediate = false)
         } else {
@@ -319,7 +337,12 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         stopPolling()
         if (!isRead(inbox, summary)) {
             read = read + (inbox.key to read[inbox.key].orEmpty() + summary.id)
-            setUnread(inbox, messages)
+            if (listLoaded) setUnread(inbox, messages)
+            else {
+                // Reopened after a process death, before any listing: one unread fewer, not zero.
+                unread = unread + (inbox.key to ((unread[inbox.key] ?: 1) - 1).coerceAtLeast(0))
+                saveRead()
+            }
         }
         messageJob?.cancel()
         content = null
@@ -355,6 +378,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 deleted == null -> Unit
                 !deleted -> error = "${inbox.provider.label} did not delete the message"
                 else -> {
+                    // The listing kept for a quick reopen must not bring it back either.
+                    lastFetch[inbox.key]?.let { f -> lastFetch[inbox.key] = f.copy(list = f.list.filterNot { it.id == summary.id }) }
                     if (currentInbox()?.key == inbox.key) {
                         messages = messages.filterNot { it.id == summary.id }
                         setUnread(inbox, messages)
@@ -382,7 +407,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
 
     /** Manual refresh, throttled to once per [MANUAL_REFRESH_MIN_MS]; restarts the polling loop. */
     fun refresh(inbox: Inbox) {
-        val wait = MANUAL_REFRESH_MIN_MS - (System.currentTimeMillis() - lastFetchAt(inbox))
+        val last = lastFetchAt(inbox)
+        val wait = if (last == 0L) 0L else MANUAL_REFRESH_MIN_MS - (now() - last)
         if (wait > 0) {
             notice = "Refreshed less than 30 s ago · try again in ${(wait / 1000) + 1} s"
             return
@@ -411,7 +437,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             val shown = if (hidden.isNullOrEmpty()) list else list.filterNot { it.id in hidden }
             // Once the server no longer lists a deleted id, it needs no hiding.
             hidden?.retainAll { id -> list.any { it.id == id } }
-            lastFetch[inbox.key] = System.currentTimeMillis() to shown
+            lastFetch[inbox.key] = Fetch(now(), System.currentTimeMillis(), shown)
             providerFor(inbox).takeNotice()?.let { notice = it }
             if (shown != messages) messages = shown
             setUnread(inbox, shown)
@@ -437,7 +463,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         pollJob = viewModelScope.launch {
             if (!immediate && lastFetchAt(inbox) > 0) {
                 if (!settings.autoRefresh) return@launch
-                val wait = lastFetchAt(inbox) + interval - System.currentTimeMillis()
+                val wait = lastFetchAt(inbox) + interval - now()
                 if (wait > 0) delay(wait)
             }
             var first = true
