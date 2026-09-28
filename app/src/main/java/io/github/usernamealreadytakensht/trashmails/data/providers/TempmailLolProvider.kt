@@ -14,6 +14,8 @@ import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -53,12 +55,17 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
         )
     }
 
-    override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
+    /**
+     * Not cancellable once sent: the server drops the emails as it hands them over, so a listing
+     * cancelled by navigation between the reply and the cache write would lose them for good. The
+     * HTTP timeouts bound how long it can outlive its screen.
+     */
+    override suspend fun listMessages(inbox: Inbox): List<MailSummary> = withContext(NonCancellable) {
         val token = inbox.token ?: throw ProviderException("Missing token")
         val json = JSONObject(http.get("$BASE/inbox?token=${URLEncoder.encode(token, "UTF-8")}"))
         val arr = json.optJSONArray("emails")
         // An expired inbox (or a reply without emails) only means nothing new: what was received stays.
-        if (arr == null || arr.length() == 0) return cache.load(inbox.key)
+        if (arr == null || arr.length() == 0) return@withContext cache.load(inbox.key)
         val fresh = (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)
             val from = m.textOrEmpty("from")
@@ -73,7 +80,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
             )
         }
         // Merged under the cache lock: a deletion running meanwhile must not be undone.
-        return cache.update(inbox.key) { known -> (fresh + known).distinctBy { it.id } }
+        cache.update(inbox.key) { known -> (fresh + known).distinctBy { it.id } }
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
