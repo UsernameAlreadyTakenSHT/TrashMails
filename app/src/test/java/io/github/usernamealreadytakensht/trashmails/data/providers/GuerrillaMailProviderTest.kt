@@ -35,6 +35,15 @@ class GuerrillaMailProviderTest {
     }
 
     @Test
+    fun createInbox_keepsTheNameTheServerSettledOn() = runBlocking {
+        val http = FakeHttp().on("f=set_email_user", body("""{"email_addr":"abc@sharklasers.com","sid_token":"s"}"""))
+        val created = GuerrillaMailProvider(http).createInbox("a.b-c")
+
+        assertEquals("abc", created.id)
+        assertEquals("abc@guerrillamail.com", created.address)
+    }
+
+    @Test
     fun listMessages_attachesOnceThenReusesTheSession() = runBlocking {
         val http = FakeHttp()
             .on("f=set_email_user", fixture("guerrilla_set_email_user"))

@@ -80,8 +80,11 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
      * Guerrilla Mail domain delivers to the same inbox, the API always answers with its own.
      */
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
-        val n = sanitizeName(name) ?: randomName()
-        val json = attach(n)
+        val requested = sanitizeName(name) ?: randomName()
+        val json = attach(requested)
+        // The inbox is the name the server settled on, should it differ from the one asked for:
+        // every later listing is checked against it.
+        val n = json.optString("email_addr").substringBefore('@').takeIf { it.isNotBlank() } ?: requested
         val domain = options.domain?.takeIf { it in provider.domains } ?: DOMAIN
         val local = json.optString("alias").takeIf { options.scramble && it.isNotBlank() } ?: n
         return Inbox(
