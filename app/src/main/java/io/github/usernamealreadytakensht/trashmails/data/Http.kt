@@ -33,6 +33,11 @@ object Http : HttpApi {
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        // The read timeout is per read: a server trickling a byte at a time is cut off here.
+        .callTimeout(60, TimeUnit.SECONDS)
+        // No API redirects; followed, a redirect would carry the tokens, headers and passwords to another host.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
     override suspend fun get(url: String, headers: Map<String, String>): String =
