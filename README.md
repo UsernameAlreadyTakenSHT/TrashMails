@@ -45,7 +45,7 @@ the providers that keep none (tempmail.lol, DropMail.me), bodies included. Remov
 
 ## Build
 
-Requires Android Studio (or a JDK and the Android SDK, API 37; Gradle provisions the JDK 25 toolchain it builds with).
+Requires Android Studio (or JDK 17+ and the Android SDK, API 37). Gradle runs on the JDK of `JAVA_HOME` and downloads none.
 
 ```
 ./gradlew assembleDebug
