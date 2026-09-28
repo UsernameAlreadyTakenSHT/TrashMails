@@ -43,7 +43,14 @@ android {
                 enable = true
             }
             if (keystoreProps.isNotEmpty()) signingConfig = signingConfigs.getByName("release")
+            // No commit hash in the APK: the build does not depend on the checkout it comes from.
+            vcsInfo.include = false
         }
+    }
+    // No Google-encrypted dependency metadata in the signing block (F-Droid rejects the opaque blob).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
