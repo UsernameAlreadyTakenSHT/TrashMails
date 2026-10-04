@@ -57,6 +57,26 @@ class HtmlTextTest {
     }
 
     @Test
+    fun unclosedTagRuns_stayLinear() {
+        for (hostile in listOf(
+            "<p>x</p>" + "<".repeat(1 shl 20),
+            "<p>x</p>" + "<li ".repeat(250_000),
+            "<p>x</p>" + "<p ".repeat(250_000),
+            "<a href=x>" + "<".repeat(500_000) + "</a>",
+        )) {
+            val start = System.nanoTime()
+            htmlToText(hostile)
+            val ms = (System.nanoTime() - start) / 1_000_000
+            assertTrue("took $ms ms on ${hostile.take(12)}", ms < 2_000)
+        }
+    }
+
+    @Test
+    fun tagsBeforeAnUnclosedOne_areStillStripped() {
+        assertEquals("a\nb <c", htmlToText("<p>a</p><b>b</b> <c"))
+    }
+
+    @Test
     fun hrefAfterTheTag_isNotTaken() {
         assertEquals("a b", htmlToText("<a>a</a> <b href=x>b</b>"))
     }

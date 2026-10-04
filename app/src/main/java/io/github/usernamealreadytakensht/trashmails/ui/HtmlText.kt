@@ -7,7 +7,8 @@ package io.github.usernamealreadytakensht.trashmails.ui
  *
  * The input is sender-controlled, so every pass is linear: blocks, comments and anchors are
  * found with indexOf scans rather than lazy `.*?` regexes (which turn quadratic on unclosed
- * tags), and the input is capped at [MAX_INPUT] characters.
+ * tags), the tag regexes never run past the last `>` ([replaceTags]), and the input is capped
+ * at [MAX_INPUT] characters.
  */
 fun htmlToText(html: String): String {
     val truncated = html.length > MAX_INPUT
@@ -15,10 +16,10 @@ fun htmlToText(html: String): String {
     for (tag in listOf("script", "style", "head")) s = stripBlocks(s, tag)
     s = stripComments(s)
     s = spellOutLinks(s)
-    s = s.replace(LI, "\n• ")
-        .replace(BLOCK_BREAK, "\n")
-        .replace(CELL_END, " ")
-        .replace(TAG, "")
+    s = s.replaceTags(LI, "\n• ")
+        .replaceTags(BLOCK_BREAK, "\n")
+        .replaceTags(CELL_END, " ")
+        .replaceTags(TAG, "")
         .replace(OPEN, '<').replace(CLOSE, '>')
     s = decodeEntities(s)
     val out = StringBuilder(s.length)
@@ -44,6 +45,17 @@ private val CELL_END = Regex("""(?i)</t[dh]>""")
 private val TAG = Regex("<[^>]+>")
 private val HREF = Regex("""(?i)\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
 private val ENTITY = Regex("""&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);""")
+
+/**
+ * [tag] (a pattern ending with `>`) replaced, but only up to the last `>`: a `<` with no `>` after
+ * it would make every match attempt scan to the end of the text (quadratic on a run of `<`), and
+ * after the last `>` no tag can match anyway. Before it, each attempt stops at the next `>`.
+ */
+private fun String.replaceTags(tag: Regex, with: String): String {
+    val cut = lastIndexOf('>') + 1
+    if (cut == 0) return this
+    return tag.replace(substring(0, cut), with) + substring(cut)
+}
 
 /** True when [s] has `<tag` (or `</tag` when [i] points at the `/`) at [i], followed by whitespace, `>` or `/`. */
 private fun tagAt(s: String, i: Int, tag: String): Boolean {
@@ -108,7 +120,7 @@ private fun spellOutLinks(s: String): String {
         // Searched within the tag only: a search to the end of the text for every anchor is quadratic.
         val href = HREF.find(s.substring(start, tagEnd))
             ?.let { m -> m.groupValues.drop(1).firstOrNull { it.isNotEmpty() } }
-        val text = s.substring(tagEnd + 1, close).replace(TAG, "").trim()
+        val text = s.substring(tagEnd + 1, close).replaceTags(TAG, "").trim()
         out.append(
             when {
                 href.isNullOrEmpty() -> text
