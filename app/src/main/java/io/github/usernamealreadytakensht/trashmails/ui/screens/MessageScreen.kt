@@ -299,6 +299,9 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                 // use to tell two disposable addresses are read on the same device.
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
                 CookieManager.getInstance().setAcceptCookie(false)
+                // The default user agent names the device model, Android build and WebView version:
+                // a stable mark next to the IP once images load. Chrome's own reduced form instead.
+                settings.userAgentString = GENERIC_USER_AGENT
             }
         },
         update = { view ->
@@ -382,6 +385,10 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
 
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
 private fun isAllowedLink(uri: Uri): Boolean = uri.scheme?.lowercase() in setOf("http", "https", "mailto")
+
+/** What Chrome itself sends with user-agent reduction: no model, no build, a frozen Android version. */
+private const val GENERIC_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
 
 /** Longest link opened or offered: browsers cap URLs around 2 MB, real ones stay far below this. */
 private const val MAX_LINK_CHARS = 8 * 1024
