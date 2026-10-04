@@ -16,6 +16,12 @@ class SummaryBoundsTest {
     }
 
     @Test
+    fun aBodyLosesItsBidiControls_soALinkReadsAsWhatItIs() {
+        val body = "Click ‮⁦https://evil.example/⁩⁦https://bank.com/login?next=⁩‬ now"
+        assertEquals("Click https://evil.example/https://bank.com/login?next= now", body.withoutBidiControls())
+    }
+
+    @Test
     fun serverAddresses_mustBePlain() {
         assertEquals("ab.c+d@sub.example.com", checkedAddress("ab.c+d@sub.example.com", Provider.MAIL_TM))
         for (bad in listOf("a@b", "a\n@b.com", "a@b.com\u202E", "a".repeat(100) + "@b.com", "a@b.com x", "@b.com")) {

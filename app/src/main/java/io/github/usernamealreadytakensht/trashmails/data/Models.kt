@@ -117,7 +117,10 @@ private const val MAX_ID_CHARS = 1_000
 /** Bidirectional controls: they make a sender or subject display other than what it is (RLO, isolates, marks). */
 private val BIDI_CONTROLS = Regex("[\u200E\u200F\u202A-\u202E\u2066-\u2069]")
 
-private fun String.forHeader() = take(MAX_HEADER_CHARS).replace(BIDI_CONTROLS, "")
+/** Without bidirectional controls: what is shown reads in the order it is stored, links included. */
+fun String.withoutBidiControls(): String = replace(BIDI_CONTROLS, "")
+
+private fun String.forHeader() = take(MAX_HEADER_CHARS).withoutBidiControls()
 
 /**
  * The sender-controlled lines of a summary made safe to show and keep: bounded (they travel in

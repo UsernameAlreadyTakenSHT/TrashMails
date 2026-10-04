@@ -210,7 +210,9 @@ fun MessageScreen(
 }
 
 /** Web addresses in a plain body; trailing punctuation is left out of the link. */
-private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""")
+// Format characters end an address too (a second guard behind the bidi controls dropped upstream);
+// U+0001/U+0002 are HtmlText's stand-ins for the brackets around a spelled-out link.
+private val URL_IN_TEXT = Regex("""https?://[^\s<>"'\x{1}\x{2}\p{Cf}]+""")
 private const val URL_TRAIL = ".,;:!?)]}>'\""
 
 /** Most links made tappable in a plain body. */

@@ -24,6 +24,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
 import io.github.usernamealreadytakensht.trashmails.data.bounded
 import io.github.usernamealreadytakensht.trashmails.data.isSane
+import io.github.usernamealreadytakensht.trashmails.data.withoutBidiControls
 import io.github.usernamealreadytakensht.trashmails.data.providers.allProviders
 import io.github.usernamealreadytakensht.trashmails.data.text
 import kotlinx.coroutines.CancellationException
@@ -386,7 +387,9 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             content = attempt("Could not load the message") {
                 // The plain text is derived here, once and off the main thread, when the provider has none.
                 val c = providerFor(inbox).getMessage(inbox, summary)
-                if (c.text == null && c.html != null) c.copy(text = htmlToText(c.html)) else c
+                // Bidi controls go from the text: they could make a link read as another address
+                // (the tappable text is the stored order, the shown one the reordered).
+                c.copy(text = (c.text ?: c.html?.let(::htmlToText))?.withoutBidiControls())
             }?.also { c ->
                 if ((c.html?.length ?: 0) + (c.text?.length ?: 0) <= MAX_RECENT_BODY_CHARS) recentBodies[bodyKey] = c
             }
