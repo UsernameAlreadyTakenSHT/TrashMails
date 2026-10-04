@@ -360,11 +360,7 @@ private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClie
 @Composable
 private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
     val uri = Uri.parse(url)
-    // A non-ASCII host is shown with its punycode form too: a look-alike letter must not pass for the real site.
-    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host?.let { host ->
-        val ascii = runCatching { IDN.toASCII(host) }.getOrDefault(host)
-        if (ascii.equals(host, ignoreCase = true)) host else "$host ($ascii)"
-    } ?: url
+    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host?.let(::displayHost) ?: url
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (uri.scheme.equals("mailto", ignoreCase = true)) "Write to this address?" else "Open this site?") },
@@ -389,6 +385,19 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+/**
+ * A host as the link dialog shows it: a non-ASCII one with its punycode form too, so a look-alike
+ * letter cannot pass for the real site. When punycode cannot be computed (java.net.IDN knows only
+ * Unicode 3.2: a later character, even an invisible one, made it fail and the bare Unicode host was
+ * shown), every non-ASCII character is spelled out as a code point instead.
+ */
+internal fun displayHost(host: String): String {
+    if (host.all { it.code < 0x80 }) return host
+    val ascii = runCatching { IDN.toASCII(host, IDN.ALLOW_UNASSIGNED) }.getOrNull()
+        ?: host.codePoints().toArray().joinToString("") { cp -> if (cp < 0x80) cp.toChar().toString() else "\\u{%X}".format(cp) }
+    return if (ascii.equals(host, ignoreCase = true)) host else "$host ($ascii)"
 }
 
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */

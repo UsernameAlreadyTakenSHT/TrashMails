@@ -20,6 +20,16 @@ class ViewportTest {
     }
 
     @Test
+    fun displayHost_neverShowsALookAlikeAlone() {
+        assertEquals("paypal.com", displayHost("paypal.com"))
+        assertEquals("pаypal.com (xn--pypal-4ve.com)", displayHost("pаypal.com"))
+        // A variation selector made IDN.toASCII throw, and the bare host was shown.
+        val tricky = "pаypal.com󠄀"
+        val shown = displayHost(tricky)
+        assertTrue(shown, shown.startsWith("$tricky (") && (shown.contains("xn--") || shown.contains("\\u{430}")))
+    }
+
+    @Test
     fun unclosedHeadRuns_stayLinear() {
         val start = System.nanoTime()
         withViewport("<head".repeat(400_000))
