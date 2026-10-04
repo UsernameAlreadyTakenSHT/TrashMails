@@ -22,9 +22,9 @@ class ViewportTest {
     @Test
     fun displayHost_neverShowsALookAlikeAlone() {
         assertEquals("paypal.com", displayHost("paypal.com"))
-        assertEquals("pаypal.com (xn--pypal-4ve.com)", displayHost("pаypal.com"))
+        assertEquals("p\u0430ypal.com (xn--pypal-4ve.com)", displayHost("p\u0430ypal.com"))
         // A variation selector made IDN.toASCII throw, and the bare host was shown.
-        val tricky = "pаypal.com󠄀"
+        val tricky = "p\u0430ypal.com\uDB40\uDD00"
         val shown = displayHost(tricky)
         assertTrue(shown, shown.startsWith("$tricky (") && (shown.contains("xn--") || shown.contains("\\u{430}")))
     }

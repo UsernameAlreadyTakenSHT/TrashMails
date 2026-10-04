@@ -8,7 +8,7 @@ import org.junit.Test
 class SummaryBoundsTest {
     @Test
     fun headersAreBounded_andBidiControlsDropped() {
-        val s = MailSummary(id = "1", from = "evil‮moc.lapyap@x", subject = "s".repeat(500_000), date = 1, to = "a⁦b")
+        val s = MailSummary(id = "1", from = "evil\u202Emoc.lapyap@x", subject = "s".repeat(500_000), date = 1, to = "a\u2066b")
         val b = s.bounded()
         assertEquals("evilmoc.lapyap@x", b.from)
         assertEquals(1_000, b.subject.length)
@@ -18,7 +18,7 @@ class SummaryBoundsTest {
     @Test
     fun serverAddresses_mustBePlain() {
         assertEquals("ab.c+d@sub.example.com", checkedAddress("ab.c+d@sub.example.com", Provider.MAIL_TM))
-        for (bad in listOf("a@b", "a\n@b.com", "a@b.com‮", "a".repeat(100) + "@b.com", "a@b.com x", "@b.com")) {
+        for (bad in listOf("a@b", "a\n@b.com", "a@b.com\u202E", "a".repeat(100) + "@b.com", "a@b.com x", "@b.com")) {
             assertTrue(bad, runCatching { checkedAddress(bad, Provider.MAIL_TM) }.isFailure)
         }
     }
