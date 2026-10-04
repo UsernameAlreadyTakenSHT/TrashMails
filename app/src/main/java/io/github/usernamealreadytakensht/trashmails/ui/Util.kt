@@ -14,8 +14,8 @@ private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
 /**
  * Copies [text]; [confirmation] is what the toast says on Android 10–12 (Android 13+ shows its own).
- * A [sensitive] clip (a message body, which may hold a verification code) is flagged so the
- * system preview hides it, and its confirmation never repeats the content.
+ * A [sensitive] clip (a message body or link, which may hold a code or token; the address of a
+ * public inbox, which opens it) is flagged so the system preview and keyboard histories hide it.
  */
 fun Context.copyToClipboard(text: String, confirmation: String, sensitive: Boolean = false) {
     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

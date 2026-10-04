@@ -157,7 +157,7 @@ fun HomeScreen(
                         unread = unread[inbox.key],
                         busy = inbox.key in deleting,
                         onClick = { onOpen(inbox) },
-                        onCopy = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") },
+                        onCopy = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}", sensitive = inbox.provider.publicInbox) },
                         onDelete = { toDelete = inbox.key },
                     )
                 }

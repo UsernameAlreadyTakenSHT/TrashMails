@@ -90,7 +90,7 @@ fun InboxScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
-                    IconButton(onClick = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}") }) {
+                    IconButton(onClick = { context.copyToClipboard(inbox.address, "Copied: ${inbox.address}", sensitive = inbox.provider.publicInbox) }) {
                         Icon(CopyIcon, contentDescription = "Copy address")
                     }
                     if (inbox.provider.extendedAddresses) IconButton(onClick = { extending = true }) {

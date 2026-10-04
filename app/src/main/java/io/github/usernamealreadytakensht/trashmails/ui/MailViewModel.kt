@@ -268,7 +268,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             quota.record(provider)
             refreshQuota()
             if (settings.lastProvider != provider) updateSettings(settings.copy(lastProvider = provider))
-            if (settings.copyOnCreate) getApplication<Application>().copyToClipboard(inbox.address, "Copied: ${inbox.address}")
+            if (settings.copyOnCreate) getApplication<Application>().copyToClipboard(inbox.address, "Copied: ${inbox.address}", sensitive = inbox.provider.publicInbox)
             openInbox(inbox)
         }
     }

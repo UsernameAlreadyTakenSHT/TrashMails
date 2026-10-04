@@ -64,6 +64,9 @@ enum class Provider(
 
     val available: Boolean get() = unavailableReason == null
 
+    /** Anyone who has the address can read the inbox: the address is as good as a password. */
+    val publicInbox: Boolean get() = this == INBOX_KITTEN || this == MAILDROP || this == GUERRILLA_MAIL
+
     companion object {
         /** The entry named [name], or null: stored names may come from a version that no longer has it. */
         fun fromName(name: String?): Provider? = entries.firstOrNull { it.name == name }
