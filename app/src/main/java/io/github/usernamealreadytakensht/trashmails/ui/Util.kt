@@ -6,6 +6,9 @@ import android.content.Context
 import android.os.Build
 import android.os.PersistableBundle
 import android.widget.Toast
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 
@@ -54,9 +57,9 @@ fun formatDate(millis: Long): String {
     return if (date.format(d) == date.format(Date())) time.format(d) else dateTime.format(d)
 }
 
-fun formatRemaining(expiresAt: Long?): String? {
+fun formatRemaining(expiresAt: Long?, now: Long = System.currentTimeMillis()): String? {
     expiresAt ?: return null
-    val left = expiresAt - System.currentTimeMillis()
+    val left = expiresAt - now
     if (left <= 0) return "expired"
     val h = left / 3_600_000
     val m = (left % 3_600_000) / 60_000
@@ -70,3 +73,16 @@ fun formatDuration(millis: Long): String {
     val m = (left % 3_600_000) / 60_000
     return if (h > 0) "$h h ${m.toString().padStart(2, '0')} min" else "${m.coerceAtLeast(1)} min"
 }
+
+/**
+ * The current time, updated at each turn of the minute while on screen: what a label counting
+ * down in minutes ("expires in 12 min") reads so it does not stay frozen until something else
+ * redraws it.
+ */
+@Composable
+fun rememberMinuteClock(): Long = produceState(System.currentTimeMillis()) {
+    while (true) {
+        delay(60_000 - value % 60_000)
+        value = System.currentTimeMillis()
+    }
+}.value

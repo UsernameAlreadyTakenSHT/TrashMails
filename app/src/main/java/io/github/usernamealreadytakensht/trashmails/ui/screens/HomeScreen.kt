@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -91,6 +92,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.ProviderLogo
 import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDuration
 import io.github.usernamealreadytakensht.trashmails.ui.formatRemaining
+import io.github.usernamealreadytakensht.trashmails.ui.rememberMinuteClock
 import io.github.usernamealreadytakensht.trashmails.ui.rememberMessageHost
 import io.github.usernamealreadytakensht.trashmails.ui.retentionInfo
 
@@ -169,6 +171,12 @@ fun HomeScreen(
     }
 
     if (showDialog) {
+        // A slot coming free while the dialog is open: the quotas are counted again, so the
+        // provider can be picked and Create pressed without closing the dialog first.
+        val now = rememberMinuteClock()
+        LaunchedEffect(now) {
+            if (quotas.values.any { it.exhausted && (it.nextSlotAt ?: Long.MAX_VALUE) <= now }) onOpenCreate()
+        }
         CreateInboxDialog(
             creating = creating,
             error = createError,
@@ -231,7 +239,7 @@ private fun InboxCard(
                     unread?.takeIf { it > 0 }?.let { n ->
                         Badge(Modifier.clearAndSetSemantics { contentDescription = "$n unread" }) { Text("$n") }
                     }
-                    formatRemaining(inbox.expiresAt)?.let {
+                    formatRemaining(inbox.expiresAt, rememberMinuteClock())?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -653,12 +661,11 @@ private fun CreateStatusLine(creating: Boolean, error: String?) {
 @Composable
 private fun QuotaLine(status: CreationQuota.Status?) {
     status ?: return
+    // Counted down at each minute; once at zero the dialog has the quotas counted again.
+    val wait = (status.nextSlotAt ?: 0L) - rememberMinuteClock()
     val (text, color) = when {
-        status.exhausted -> {
-            val wait = (status.nextSlotAt ?: 0L) - System.currentTimeMillis()
-            "Limit of ${status.limit} per 24 h reached · next slot in ${formatDuration(wait)}" to
-                MaterialTheme.colorScheme.error
-        }
+        status.exhausted -> "Limit of ${status.limit} per 24 h reached · next slot in ${formatDuration(wait)}" to
+            MaterialTheme.colorScheme.error
         else -> "${status.remaining} of ${status.limit} left (rolling 24 h)" to
             MaterialTheme.colorScheme.onSurfaceVariant
     }
