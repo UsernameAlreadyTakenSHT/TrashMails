@@ -50,6 +50,8 @@ class DropMailProvider(
         /** A token younger than this is not replaced on a 403: the refusal is more likely a firewall than the token. */
         const val TOKEN_MIN_AGE_MS = 3_600_000L
         const val MAX_TOMBSTONES = 200
+        /** A session lists 100 mails at most: this many ids cover it with room to spare. */
+        const val MAX_RECEIVED = 500
         val TOKEN_FORMAT = Regex("af_[A-Za-z0-9_-]{8,256}")
         const val KEY_TOKEN = "token"
         const val TOKEN_CONTEXT = "dropmail-device-token"
@@ -99,7 +101,10 @@ class DropMailProvider(
             return cache.load(inbox.key)
         }
         val ids = session.optJSONArray("mails") ?: fail(json, "DropMail.me could not list the inbox")
-        val held = cache.load(inbox.key).map { it.id }.toSet() + tombstones(inbox)
+        // Received before (even if dropped from the cache since, kept a week or past its bounds) or
+        // deleted: the server lists them as long as the session lives, and they must not come back.
+        val received = received(inbox)
+        val held = cache.load(inbox.key).map { it.id }.toSet() + tombstones(inbox) + received
         val unseen = (0 until ids.length()).mapNotNull { ids.optJSONObject(it)?.text("id") }.filterNot { it in held }
         if (unseen.isEmpty()) return cache.load(inbox.key)
         val full = graphql("{ session(id: ${quote(sessionId)}) { id mails { $MAIL_FIELDS } } }")
@@ -122,7 +127,8 @@ class DropMailProvider(
         // (leaving a message screen starts a poll) must not be undone by this listing.
         return cache.update(inbox.key) { known ->
             val deleted = tombstones(inbox)
-            (fresh + known).distinctBy { it.id }.filterNot { it.id in deleted }
+            prefs.put(receivedKey(inbox) to JSONArray((received + fresh.map { it.id }).distinct().takeLast(MAX_RECEIVED)).toString())
+            (fresh.filterNot { it.id in received } + known).distinctBy { it.id }.filterNot { it.id in deleted }
         }
     }
 
@@ -147,7 +153,7 @@ class DropMailProvider(
 
     override fun forgetInbox(inbox: Inbox) {
         // One step under the cache lock: a restoration in flight cannot save its session in between.
-        cache.clear(inbox.key) { prefs.remove(sessionKey(inbox), deletedKey(inbox)) }
+        cache.clear(inbox.key) { prefs.remove(sessionKey(inbox), deletedKey(inbox), receivedKey(inbox)) }
     }
 
     /**
@@ -272,6 +278,13 @@ class DropMailProvider(
     /** What a restore key is sealed for: its address. */
     private fun restoreContext(inbox: Inbox) = "dropmail-restore:${inbox.key}"
     private fun deletedKey(inbox: Inbox) = "deleted:${inbox.key}"
+    private fun receivedKey(inbox: Inbox) = "received:${inbox.key}"
+
+    /** Ids of the mails already taken into the cache for [inbox], whether still there or not. */
+    private fun received(inbox: Inbox): List<String> {
+        val arr = prefs.getString(receivedKey(inbox))?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
+        return (0 until arr.length()).map { arr.optString(it) }
+    }
 
     /** The current session id (null when none was ever stored) and restore key of [inbox]. */
     private fun loadSession(inbox: Inbox): Pair<String?, String> {

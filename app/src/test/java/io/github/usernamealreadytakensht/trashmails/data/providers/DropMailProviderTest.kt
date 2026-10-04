@@ -190,6 +190,20 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun aMailDroppedFromTheCache_doesNotComeBack() = runBlocking {
+        val prefs = MemoryPrefs()
+        prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")
+        val cache = MessageCache(MemoryPrefs())
+        val http = http().onBody("session(id:", fixture("dropmail_session"))
+        val p = provider(http, prefs, cache)
+        assertEquals(2, p.listMessages(inbox).size)
+        // Kept a week (or past the bounds): gone from the cache while the session still lists it.
+        cache.update(inbox.key) { emptyList() }
+        assertEquals(0, p.listMessages(inbox).size)
+        assertEquals(1, http.calls.mapNotNull { it.body }.count { "text html" in it })
+    }
+
+    @Test
     fun bodiesAreFetchedOnlyWhenAMailIsNew() = runBlocking {
         val prefs = MemoryPrefs()
         prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")
