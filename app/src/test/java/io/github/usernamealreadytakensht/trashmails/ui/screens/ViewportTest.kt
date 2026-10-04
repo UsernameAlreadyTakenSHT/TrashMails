@@ -14,6 +14,14 @@ class ViewportTest {
     }
 
     @Test
+    fun explicitPrefetchLinks_areDisarmedWhileBlocked() {
+        val html = "<link rel=dns-prefetch href=//a.evil><link REL = \"preconnect\" href=https://b.evil>"
+        val blocked = withPrivacyMeta(html, blockRemote = true)
+        assertTrue(blocked, blocked.contains("<link data-rel=dns-prefetch") && blocked.contains("<link data-rel= \"preconnect\""))
+        assertTrue(withPrivacyMeta(html, blockRemote = false).contains("<link rel=dns-prefetch"))
+    }
+
+    @Test
     fun aSendersHeadCannotChooseWhereThePolicyLands() {
         // A <head> in a comment, an attribute or a title, or after body content, left the meta inert.
         for (html in listOf(
