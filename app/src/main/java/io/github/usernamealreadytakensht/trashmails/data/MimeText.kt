@@ -47,21 +47,28 @@ object MimeText {
         }
     }
 
-    /** Header names lowercased, continuation lines joined. */
+    /** Longest header value kept; real ones (even a long Content-Type) stay far below. */
+    private const val MAX_HEADER = 8 * 1024
+
+    /**
+     * Header names lowercased, continuation lines joined. Each value is built in a StringBuilder
+     * and bounded: re-concatenating the whole value at every continuation line was quadratic on a
+     * header folded over hundreds of thousands of lines.
+     */
     private fun unfold(block: String): Map<String, String> {
-        val out = LinkedHashMap<String, String>()
-        var name: String? = null
+        val out = LinkedHashMap<String, StringBuilder>()
+        var current: StringBuilder? = null
         for (line in block.lineSequence()) {
-            if (line.firstOrNull()?.isWhitespace() == true && name != null) {
-                out[name] = out[name] + " " + line.trim()
+            if (line.firstOrNull()?.isWhitespace() == true && current != null) {
+                if (current.length < MAX_HEADER) current.append(' ').append(line.trim())
             } else {
                 val colon = line.indexOf(':')
                 if (colon <= 0) continue
-                name = line.substring(0, colon).trim().lowercase()
-                out[name] = line.substring(colon + 1).trim()
+                val name = line.substring(0, colon).trim().lowercase()
+                current = StringBuilder(line.substring(colon + 1).trim().take(MAX_HEADER)).also { out[name] = it }
             }
         }
-        return out
+        return out.mapValues { (_, v) -> v.toString().take(MAX_HEADER) }
     }
 
     /** `name=value` or `name="value"` in a header's parameter list. */

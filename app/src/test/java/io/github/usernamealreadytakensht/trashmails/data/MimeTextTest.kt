@@ -2,6 +2,7 @@ package io.github.usernamealreadytakensht.trashmails.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MimeTextTest {
@@ -70,6 +71,16 @@ class MimeTextTest {
         repeat(levels) { raw.append("Content-Type: multipart/mixed; boundary=b${it}x\n\n--b${it}x\n") }
         raw.append("Content-Type: text/plain\n\nhidden\n")
         assertEquals(MimeText.Parts(null, null), MimeText.parse(raw.toString()))
+    }
+
+    @Test
+    fun aHeaderFoldedOverManyLines_staysLinear() {
+        val raw = "Content-Type: multipart/mixed; boundary=b\n\n--b\nContent-Type: text/plain\n" +
+            " x\n".repeat(400_000) + "\nbody\n--b--\n"
+        val start = System.nanoTime()
+        MimeText.parse(raw)
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertTrue("took $ms ms", ms < 2_000)
     }
 
     @Test
