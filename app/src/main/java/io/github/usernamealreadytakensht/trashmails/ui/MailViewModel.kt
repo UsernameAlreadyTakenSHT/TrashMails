@@ -243,6 +243,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 providerFor(it).forgetInbox(it)
                 lastFetch.remove(it.key)
                 pendingDeletes.remove(it.key)
+                dropRecentBodies(it.key)
                 lastAttempt.remove(it.key)
             }
             inboxes = kept
@@ -330,6 +331,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         forgetEmptiedProviders(listOf(inbox))
         lastFetch.remove(inbox.key)
         pendingDeletes.remove(inbox.key)
+        dropRecentBodies(inbox.key)
         lastAttempt.remove(inbox.key)
         unread = unread - inbox.key
         read = read - inbox.key
@@ -374,17 +376,35 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             }
         }
         messageJob?.cancel()
-        content = null
         error = null
+        val bodyKey = "${inbox.key} ${summary.id}"
+        // Opened a moment ago: shown at once, no request, no second HTML-to-text pass.
+        recentBodies[bodyKey]?.let { content = it; messageLoading = false; return }
+        content = null
         messageLoading = true
         messageJob = viewModelScope.launch {
             content = attempt("Could not load the message") {
                 // The plain text is derived here, once and off the main thread, when the provider has none.
                 val c = providerFor(inbox).getMessage(inbox, summary)
                 if (c.text == null && c.html != null) c.copy(text = htmlToText(c.html)) else c
+            }?.also { c ->
+                if ((c.html?.length ?: 0) + (c.text?.length ?: 0) <= MAX_RECENT_BODY_CHARS) recentBodies[bodyKey] = c
             }
             messageLoading = false
         }
+    }
+
+    /**
+     * The last bodies opened, by "inbox key, message id": going back to a message just read is
+     * instant. Few and bounded in size (a long body is fetched again), dropped with their message
+     * or address.
+     */
+    private val recentBodies = object : LinkedHashMap<String, MailContent>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MailContent>) = size > MAX_RECENT_BODIES
+    }
+
+    private fun dropRecentBodies(inboxKey: String, messageId: String? = null) {
+        recentBodies.keys.removeAll { key -> if (messageId == null) key.startsWith("$inboxKey ") else key == "$inboxKey $messageId" }
     }
 
     private fun cancelMessage() {
@@ -399,6 +419,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         if ((screen as? Screen.Message)?.summary?.id == summary.id) back()
         // Hidden from listings from now on, so a poll already in flight cannot bring it back.
         pendingDeletes.getOrPut(inbox.key) { mutableSetOf() }.add(summary.id)
+        dropRecentBodies(inbox.key, summary.id)
         // Not tied to a screen: a deletion started should complete even if the user moves on.
         viewModelScope.launch {
             val deleted = attempt("Could not delete the message") { providerFor(inbox).deleteMessage(inbox, summary) }
@@ -547,6 +568,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
 
     private companion object {
         const val MANUAL_REFRESH_MIN_MS = 30_000L
+        const val MAX_RECENT_BODIES = 10
+        const val MAX_RECENT_BODY_CHARS = 512 * 1024
         const val SAVED_INBOX = "screen.inbox"
         const val SAVED_MESSAGE = "screen.message"
     }
