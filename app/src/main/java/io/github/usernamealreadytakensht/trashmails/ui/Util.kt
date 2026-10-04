@@ -1,7 +1,6 @@
 package io.github.usernamealreadytakensht.trashmails.ui
 
 import android.content.ClipData
-import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
@@ -9,6 +8,9 @@ import android.os.PersistableBundle
 import android.widget.Toast
 import java.text.DateFormat
 import java.util.Date
+
+/** ClipDescription.EXTRA_IS_SENSITIVE, by its value: the constant only exists from Android 13. */
+private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
 /**
  * Copies [text]; [confirmation] is what the toast says on Android 10–12 (Android 13+ shows its own).
@@ -18,8 +20,10 @@ import java.util.Date
 fun Context.copyToClipboard(text: String, confirmation: String, sensitive: Boolean = false) {
     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText(if (sensitive) "message" else "email", text)
-    if (sensitive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+    if (sensitive) {
+        // The constant is Android 13's, but keyboards with a clipboard history (Gboard, SwiftKey…)
+        // honour the same key on older versions too, so it is set on all of them.
+        clip.description.extras = PersistableBundle().apply { putBoolean(EXTRA_IS_SENSITIVE, true) }
     }
     try {
         cm.setPrimaryClip(clip)
