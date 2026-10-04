@@ -40,7 +40,8 @@ service comes back.
 
 No backend, no tracking: the app only talks to the providers' public APIs. What stays on the device, in the
 app's private storage and excluded from Android backup (the app opts out altogether): the mail.tm account
-password, the tempmail.lol inbox tokens, the DropMail.me device token and restore keys, and the emails of
+password, the tempmail.lol inbox tokens, the DropMail.me device token and restore keys (those secrets sealed
+with an Android Keystore key, AES-256-GCM), and the emails of
 the providers that keep none (tempmail.lol, DropMail.me), bodies included, for seven days at most. Removing
 an address drops all of it (the DropMail.me device token goes with the last one). The recent-apps screen shows
 no snapshot of the app (Android 13+), and the HTML view sends a generic user agent and leaves nothing on disk.
