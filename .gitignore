@@ -12,3 +12,7 @@
 # Release signing (never commit)
 /trashmails-release.jks
 /keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
