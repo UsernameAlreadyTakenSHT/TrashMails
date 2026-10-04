@@ -130,7 +130,8 @@ class MessageCacheTest {
 
     private val prefs = CountingPrefs()
     private val cache = MessageCache(prefs)
-    private val long = MailSummary(id = "1", from = "a", subject = "s", date = 1L, html = "x".repeat(200_000))
+    private val now = System.currentTimeMillis()
+    private val long = MailSummary(id = "1", from = "a", subject = "s", date = now, html = "x".repeat(200_000))
 
     @Test
     fun anOversizedBody_isNotRewrittenAtEveryRefresh() {
@@ -146,5 +147,38 @@ class MessageCacheTest {
         cache.update("k") { listOf(long) }
         assertTrue(cache.load("k").isEmpty())
         assertTrue(cache.isForgotten("k"))
+    }
+
+    @Test
+    fun anAddressStaysWithinItsBudget_oldestDroppedFirst() {
+        // Quotes double in JSON: 50 bodies of 64 Ki quotes would be 6 M characters.
+        val kept = cache.update("k") { (1..50).map { long.copy(id = "$it", date = now - it, html = "\"".repeat(100_000)) } }
+        assertTrue((prefs.getString("k")?.length ?: 0) <= 2 * 1024 * 1024)
+        assertTrue(kept.size in 1 until 50)
+        assertEquals("1", kept.first().id)
+    }
+
+    @Test
+    fun aDamagedFile_readsAsEmpty() {
+        prefs.put("k" to "[{\"id\":")
+        assertTrue(cache.load("k").isEmpty())
+        assertEquals(1, cache.update("k") { listOf(long) }.size)
+    }
+}
+
+class FileStoreTest {
+    private val dir = java.nio.file.Files.createTempDirectory("store").toFile()
+    private val store = FileStore(dir)
+
+    @Test
+    fun oneFilePerKey_removedWithIt() {
+        store.put("tempmail_lol:a@b" to "x", "dropmail:c@d" to "y")
+        assertEquals("x", store.getString("tempmail_lol:a@b"))
+        assertEquals(2, dir.listFiles()!!.size)
+        store.remove("tempmail_lol:a@b")
+        assertNull(store.getString("tempmail_lol:a@b"))
+        assertEquals(1, dir.listFiles()!!.size)
+        store.put("dropmail:c@d" to "z")
+        assertEquals("z", store.getString("dropmail:c@d"))
     }
 }
