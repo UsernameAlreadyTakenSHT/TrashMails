@@ -97,7 +97,8 @@ fun SettingsScreen(
             HorizontalDivider()
             SettingRow(
                 title = "Confirm before opening links",
-                description = "Shows the link's address and its site, and asks before leaving the app.",
+                description = "Shows the link's address and its site, and asks before leaving the app. " +
+                    "Off: one tap opens the site, and an email can cover its whole page with a link.",
                 checked = settings.confirmLinks,
                 onCheckedChange = { onChange(settings.copy(confirmLinks = it)) },
             )
