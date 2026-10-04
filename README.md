@@ -56,6 +56,17 @@ Requires Android Studio (or JDK 17+ and the Android SDK, API 37). Gradle runs on
 
 The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Minimum Android version: 10 (API 29).
 
+## Verifying a release APK
+
+Release APKs are signed with one key; its certificate's SHA-256 fingerprint is
+
+```
+16:B6:83:E2:E0:10:40:E1:EF:46:72:47:B9:55:52:29:D8:BE:6D:FB:B2:1D:9A:58:46:44:C0:EB:4C:32:7E:82
+```
+
+Check a downloaded APK with `apksigner verify --print-certs TrashMails-vX.Y.Z.apk` (Android SDK build-tools)
+or [AppVerifier](https://github.com/soupslurpr/AppVerifier) before installing it.
+
 ## Structure
 
 ```
