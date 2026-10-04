@@ -21,7 +21,13 @@ fun Context.copyToClipboard(text: String, confirmation: String, sensitive: Boole
     if (sensitive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
     }
-    cm.setPrimaryClip(clip)
+    try {
+        cm.setPrimaryClip(clip)
+    } catch (_: RuntimeException) {
+        // A body of several megabytes exceeds what the clipboard service accepts (TransactionTooLargeException).
+        Toast.makeText(this, "Too large to copy", Toast.LENGTH_SHORT).show()
+        return
+    }
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
         Toast.makeText(this, confirmation, Toast.LENGTH_SHORT).show()
     }

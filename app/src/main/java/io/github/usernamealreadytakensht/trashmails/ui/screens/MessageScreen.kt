@@ -100,6 +100,9 @@ fun MessageScreen(
     val onLink: (Uri) -> Unit = { uri ->
         when {
             !isAllowedLink(uri) -> Toast.makeText(context, "Links of this kind cannot be opened", Toast.LENGTH_SHORT).show()
+            // No real link is this long; one that is would crash the app on its way to the browser
+            // or into the saved state (both go through a binder limited to about 1 MB).
+            uri.toString().length > MAX_LINK_CHARS -> Toast.makeText(context, "This link is too long to open", Toast.LENGTH_SHORT).show()
             settings.confirmLinks -> pendingLink = uri.toString()
             else -> openLink(context, uri)
         }
@@ -380,6 +383,9 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
 private fun isAllowedLink(uri: Uri): Boolean = uri.scheme?.lowercase() in setOf("http", "https", "mailto")
 
+/** Longest link opened or offered: browsers cap URLs around 2 MB, real ones stay far below this. */
+private const val MAX_LINK_CHARS = 8 * 1024
+
 /** Opens an allowed link in the browser (or the mail app for mailto:). */
 private fun openLink(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW, uri)
@@ -388,6 +394,9 @@ private fun openLink(context: Context, uri: Uri) {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
+    } catch (_: RuntimeException) {
+        // TransactionTooLargeException and the like, rethrown by the system as a RuntimeException.
+        Toast.makeText(context, "This link could not be opened", Toast.LENGTH_SHORT).show()
     }
 }
 
