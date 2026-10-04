@@ -1,10 +1,14 @@
 package io.github.usernamealreadytakensht.trashmails.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import org.json.JSONException
 import java.io.InterruptedIOException
@@ -33,9 +37,10 @@ private const val MAX_MESSAGE_LENGTH = 200
 
 /**
  * A [SnackbarHostState] fed by the ViewModel's [error] (with an OK action) and [notice] (short,
- * no action). Each is cleared once its snackbar goes away, or when the screen is left, so the
- * same text can show again later and never resurfaces on return. The dismiss callbacks receive
- * the text that was shown: a newer message that replaced it meanwhile must not be wiped.
+ * no action). Each is cleared once its snackbar goes away, or when the screen is left (not when
+ * the activity is only recreated), so the same text can show again later and never resurfaces
+ * on return. The dismiss callbacks receive the text that was shown: a newer message that
+ * replaced it meanwhile must not be wiped.
  */
 @Composable
 fun rememberMessageHost(
@@ -45,12 +50,16 @@ fun rememberMessageHost(
     onDismissNotice: (String) -> Unit,
 ): SnackbarHostState {
     val host = remember { SnackbarHostState() }
+    val activity = LocalContext.current.findActivity()
+    // A rotation or a theme change recreates the activity, which cancels the snackbar mid-way:
+    // the message is kept then, to show again in the new one, instead of being lost unread.
+    fun recreating() = activity?.isChangingConfigurations == true
     LaunchedEffect(error) {
         error ?: return@LaunchedEffect
         try {
             host.showSnackbar(error, actionLabel = "OK", duration = SnackbarDuration.Long)
         } finally {
-            onDismissError(error)
+            if (!recreating()) onDismissError(error)
         }
     }
     LaunchedEffect(notice) {
@@ -58,8 +67,14 @@ fun rememberMessageHost(
         try {
             host.showSnackbar(notice, duration = SnackbarDuration.Short)
         } finally {
-            onDismissNotice(notice)
+            if (!recreating()) onDismissNotice(notice)
         }
     }
     return host
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
