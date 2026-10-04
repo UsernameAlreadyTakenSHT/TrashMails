@@ -60,6 +60,13 @@ class ViewportTest {
     }
 
     @Test
+    fun mailtoDialog_showsEveryRecipient_oneLineEach() {
+        val padded = "mailto:support@bank.com?subject=Hi" + "%0A".repeat(300) + "&to=attacker@evil.com"
+        assertEquals("support@bank.com\nattacker@evil.com", mailtoRecipients(padded))
+        assertEquals("a@b.c\nd@e.f", mailtoRecipients("mailto:a@b.c,%E2%80%AEd@e.f%0A"))
+    }
+
+    @Test
     fun mailto_keepsRecipientsSubjectAndBodyOnly() {
         assertEquals(
             "mailto:a@b.c?subject=Hi&body=x%20y",

@@ -73,6 +73,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.localDeleteNote
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.IDN
+import java.net.URLDecoder
 
 /**
  * One message. The body is plain text unless [Settings.renderHtml] is on; either way the
@@ -374,13 +375,14 @@ private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClie
 @Composable
 private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
     val uri = Uri.parse(url)
-    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) uri.schemeSpecificPart else uri.host?.let(::displayHost) ?: url
+    // For mail, who it goes to (what will be kept of the link), one per line; for a site, its host.
+    val site = if (uri.scheme.equals("mailto", ignoreCase = true)) mailtoRecipients(url) else uri.host?.let(::displayHost) ?: url
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (uri.scheme.equals("mailto", ignoreCase = true)) "Write to this address?" else "Open this site?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 5, overflow = TextOverflow.Ellipsis)
                 SelectionContainer {
                     Text(
                         url,
@@ -461,6 +463,26 @@ private fun openLink(context: Context, uri: Uri) {
         Toast.makeText(context, "This link could not be opened", Toast.LENGTH_SHORT).show()
     }
 }
+
+/**
+ * The recipients of [mailto] (its address and to= values, the ones [plainMailto] keeps), decoded,
+ * one per line, without control or format characters: the whole decoded link used to be shown,
+ * where a subject full of %0A pushed an added to= out of sight, and bidi controls reordered it.
+ */
+internal fun mailtoRecipients(mailto: String): String {
+    val kept = plainMailto(mailto)
+    val address = kept.substringAfter(':').substringBefore('?')
+    val toFields = kept.substringAfter('?', "").split('&').filter { it.startsWith("to=") }.map { it.removePrefix("to=") }
+    return (listOf(address) + toFields)
+        .map { runCatching { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }.getOrDefault(it) }
+        .flatMap { it.split(',') }
+        .map { it.replace(UNSHOWABLE, "").trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString("\n")
+        .ifEmpty { "(no address)" }
+}
+
+private val UNSHOWABLE = Regex("""[\p{Cc}\p{Cf}\u2028\u2029]""")
 
 /** [mailto] rebuilt from its recipients (address and to=), subject and body; every other field is dropped. */
 internal fun plainMailto(mailto: String): String {
