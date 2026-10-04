@@ -30,6 +30,15 @@ class ViewportTest {
     }
 
     @Test
+    fun mailto_keepsRecipientsSubjectAndBodyOnly() {
+        assertEquals(
+            "mailto:a@b.c?subject=Hi&body=x%20y",
+            plainMailto("mailto:a@b.c?cc=spy@evil.com&subject=Hi&bcc=x@y.z&attach=/sdcard/a&body=x%20y"),
+        )
+        assertEquals("mailto:a@b.c", plainMailto("mailto:a@b.c?bcc=x@y.z"))
+    }
+
+    @Test
     fun unclosedHeadRuns_stayLinear() {
         val start = System.nanoTime()
         withViewport("<head".repeat(400_000))

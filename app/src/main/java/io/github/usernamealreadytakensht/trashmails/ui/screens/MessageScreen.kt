@@ -436,8 +436,13 @@ private const val MAX_LINK_CHARS = 8 * 1024
 
 /** Opens an allowed link in the browser (or the mail app for mailto:). */
 private fun openLink(context: Context, uri: Uri) {
-    val intent = Intent(Intent.ACTION_VIEW, uri)
-    if (!uri.scheme.equals("mailto", ignoreCase = true)) intent.addCategory(Intent.CATEGORY_BROWSABLE)
+    val intent = if (uri.scheme.equals("mailto", ignoreCase = true)) {
+        // A compose screen with the recipients, subject and body only: no cc/bcc the sender slipped
+        // in, nor an attach= some mail apps would honour. SENDTO reaches mail apps only.
+        Intent(Intent.ACTION_SENDTO, Uri.parse(plainMailto(uri.toString())))
+    } else {
+        Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
+    }
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
@@ -446,6 +451,17 @@ private fun openLink(context: Context, uri: Uri) {
         // TransactionTooLargeException and the like, rethrown by the system as a RuntimeException.
         Toast.makeText(context, "This link could not be opened", Toast.LENGTH_SHORT).show()
     }
+}
+
+/** [mailto] rebuilt from its recipients (address and to=), subject and body; every other field is dropped. */
+internal fun plainMailto(mailto: String): String {
+    val to = mailto.substringAfter(':').substringBefore('?')
+    val fields = mailto.substringAfter('?', "").split('&')
+        .mapNotNull { f -> f.split('=', limit = 2).takeIf { it.size == 2 }?.let { (k, v) -> k.lowercase() to v } }
+        .filter { (k, _) -> k == "to" || k == "subject" || k == "body" }
+        .distinctBy { it.first }
+    val query = fields.joinToString("&") { (k, v) -> "$k=$v" }
+    return "mailto:$to" + if (query.isEmpty()) "" else "?$query"
 }
 
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
