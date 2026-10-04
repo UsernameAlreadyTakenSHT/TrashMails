@@ -102,6 +102,9 @@ fun sanitizeName(raw: String?): String? =
         ?.trim('.')
         ?.takeIf { it.isNotBlank() }
 
+/** [value] as one URL query parameter value (form encoding: a space is `+`). */
+fun queryParam(value: String): String = URLEncoder.encode(value, "UTF-8")
+
 /**
  * A server-provided id as one URL path segment. Percent-encoding keeps it from adding segments
  * (`/`) or a query, but `.` and `..` would still be resolved as dot segments (`messages/..` is the

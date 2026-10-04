@@ -12,13 +12,13 @@ import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.queryParam
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.URLEncoder
 import java.security.MessageDigest
 
 /**
@@ -67,7 +67,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
         // In the query because the API takes it nowhere else (in an Authorization or any other
         // header it answers "Expected token in query parameter", checked October 2026): it reaches
         // the server's logs, but only over TLS, and no Referer ever carries it.
-        val json = JSONObject(http.get("$BASE/inbox?token=${URLEncoder.encode(token, "UTF-8")}"))
+        val json = JSONObject(http.get("$BASE/inbox?token=${queryParam(token)}"))
         val arr = json.optJSONArray("emails")
         // An expired inbox (or a reply without emails) only means nothing new: what was received stays.
         if (arr == null || arr.length() == 0) return@withContext cache.load(inbox.key)

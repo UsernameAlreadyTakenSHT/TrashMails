@@ -9,12 +9,12 @@ import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.queryParam
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
 import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
-import java.net.URLEncoder
 
 /**
  * Inbox Kitten exposes raw Mailgun events.
@@ -35,7 +35,7 @@ class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val body = http.get("$BASE/list?recipient=${URLEncoder.encode(inbox.id, "UTF-8")}")
+        val body = http.get("$BASE/list?recipient=${queryParam(inbox.id)}")
         val arr = JSONArray(body)
         val seen = HashSet<String>()
         val out = ArrayList<MailSummary>()
@@ -63,7 +63,7 @@ class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
         val key = summary.ref["key"] ?: throw ProviderException("Missing message key")
         val region = summary.ref["region"].orEmpty()
         val html = http.get(
-            "$BASE/getHtml?key=${URLEncoder.encode(key, "UTF-8")}&region=${URLEncoder.encode(region, "UTF-8")}"
+            "$BASE/getHtml?key=${queryParam(key)}&region=${queryParam(region)}"
         )
         return MailContent(html = html, text = null)
     }

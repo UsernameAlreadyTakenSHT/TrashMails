@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.queryParam
 import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
@@ -17,7 +18,6 @@ import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
 import org.json.JSONTokener
-import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -38,7 +38,6 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     /** Session token per inbox name. */
     private val sids = ConcurrentHashMap<String, String>()
 
-    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** One API call; the reply is whatever JSON value the endpoint returns (an object, or `false`). */
     private suspend fun call(f: String, params: String): Any? =
@@ -54,7 +53,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
 
     /** Attaches a new session to [name], caches and returns its token. */
     private suspend fun attach(name: String): JSONObject =
-        get("set_email_user", "&email_user=${enc(name)}").also { json ->
+        get("set_email_user", "&email_user=${queryParam(name)}").also { json ->
             json.text("sid_token")?.let { sids[name] = it }
         }
 
@@ -110,7 +109,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
         val json = withSid(inbox) { sid ->
-            get("get_email_list", "&offset=0&sid_token=${enc(sid)}").also {
+            get("get_email_list", "&offset=0&sid_token=${queryParam(sid)}").also {
                 if (!it.isListingOf(inbox)) throw SessionException("Guerrilla Mail did not return the inbox")
             }
         }
@@ -130,7 +129,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
         // `false`: the message is gone, or the session was; a fresh session tells the two apart.
         val m = withSid(inbox) { sid ->
-            call("fetch_email", "&email_id=${enc(summary.id)}&sid_token=${enc(sid)}") as? JSONObject
+            call("fetch_email", "&email_id=${queryParam(summary.id)}&sid_token=${queryParam(sid)}") as? JSONObject
                 ?: throw SessionException("This message has expired (Guerrilla Mail keeps mail for one hour)")
         }
         val body = m.text("mail_body")
@@ -142,7 +141,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     override val canDeleteMessages get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        val json = withSid(inbox) { sid -> get("del_email", "&email_ids%5B%5D=${enc(summary.id)}&sid_token=${enc(sid)}") }
+        val json = withSid(inbox) { sid -> get("del_email", "&email_ids%5B%5D=${queryParam(summary.id)}&sid_token=${queryParam(sid)}") }
         val deleted = json.optJSONArray("deleted_ids") ?: return false
         return (0 until deleted.length()).any { deleted.optString(it) == summary.id }
     }
