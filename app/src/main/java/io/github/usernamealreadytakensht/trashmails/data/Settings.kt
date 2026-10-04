@@ -43,19 +43,26 @@ data class Settings(
 class SettingsStore(private val prefs: Prefs) {
     constructor(context: Context) : this(SharedPrefs(context, "settings"))
 
+    /**
+     * The stored settings. Each one falls back to its default on its own when it cannot be read
+     * (a value of another type throws ClassCastException): read at start-up, a damaged entry must
+     * not keep the app from opening.
+     */
     fun load(): Settings {
         val defaults = Settings()
+        fun bool(key: String, default: Boolean) = runCatching { prefs.getBoolean(key, default) }.getOrDefault(default)
+        fun int(key: String, default: Int) = runCatching { prefs.getInt(key, default) }.getOrDefault(default)
+        fun string(key: String) = runCatching { prefs.getString(key) }.getOrNull()
         return Settings(
-            renderHtml = prefs.getBoolean(RENDER_HTML, defaults.renderHtml),
-            loadImages = prefs.getBoolean(LOAD_IMAGES, defaults.loadImages),
-            confirmLinks = prefs.getBoolean(CONFIRM_LINKS, defaults.confirmLinks),
-            pollIntervalSec = prefs.getInt(POLL_INTERVAL, defaults.pollIntervalSec),
-            blockScreenshots = prefs.getBoolean(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
-            forgetAfterHours = prefs.getInt(FORGET_AFTER, defaults.forgetAfterHours),
-            theme = prefs.getString(THEME) ?: defaults.theme,
-            lastProvider = Provider.fromName(prefs.getString(LAST_PROVIDER))
-                ?: defaults.lastProvider,
-            copyOnCreate = prefs.getBoolean(COPY_ON_CREATE, defaults.copyOnCreate),
+            renderHtml = bool(RENDER_HTML, defaults.renderHtml),
+            loadImages = bool(LOAD_IMAGES, defaults.loadImages),
+            confirmLinks = bool(CONFIRM_LINKS, defaults.confirmLinks),
+            pollIntervalSec = int(POLL_INTERVAL, defaults.pollIntervalSec).takeIf { it >= 0 } ?: defaults.pollIntervalSec,
+            blockScreenshots = bool(BLOCK_SCREENSHOTS, defaults.blockScreenshots),
+            forgetAfterHours = int(FORGET_AFTER, defaults.forgetAfterHours).takeIf { it >= 0 } ?: defaults.forgetAfterHours,
+            theme = string(THEME) ?: defaults.theme,
+            lastProvider = Provider.fromName(string(LAST_PROVIDER)) ?: defaults.lastProvider,
+            copyOnCreate = bool(COPY_ON_CREATE, defaults.copyOnCreate),
         )
     }
 

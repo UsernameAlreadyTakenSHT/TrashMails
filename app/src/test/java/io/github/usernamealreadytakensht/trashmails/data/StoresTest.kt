@@ -70,6 +70,16 @@ class ReadStoreTest {
 
 class SettingsStoreTest {
     @Test
+    fun aDamagedSetting_fallsBackAlone() {
+        val prefs = object : Prefs by MemoryPrefs() {
+            override fun getBoolean(key: String, default: Boolean): Boolean =
+                if (key == "confirm_links") throw ClassCastException() else default
+            override fun getInt(key: String, default: Int): Int = if (key == "poll_interval_sec") -5 else default
+        }
+        assertEquals(Settings(), SettingsStore(prefs).load())
+    }
+
+    @Test
     fun roundTrip_andDefaultsWhenEmptyOrUnknown() {
         val prefs = MemoryPrefs()
         val store = SettingsStore(prefs)
