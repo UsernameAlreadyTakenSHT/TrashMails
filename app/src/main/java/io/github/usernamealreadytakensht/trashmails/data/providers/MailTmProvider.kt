@@ -5,6 +5,7 @@ import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
 import io.github.usernamealreadytakensht.trashmails.data.pathSegment
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
@@ -18,7 +19,6 @@ import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -108,7 +108,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
                 id = m.getString("id"),
                 from = from?.optString("address").orEmpty().ifBlank { from?.optString("name").orEmpty() },
                 subject = m.textOrEmpty("subject"),
-                date = parseDate(m.optString("createdAt")),
+                date = parseIsoDate(m.optString("createdAt")),
             )
         }.sortedByDescending { it.date }
     }
@@ -170,8 +170,4 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
             json.optString("hydra:description").ifBlank { json.optString("detail") }
         }
     }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "mail.tm: $it" }
-
-    private fun parseDate(iso: String): Long =
-        runCatching { OffsetDateTime.parse(iso).toInstant().toEpochMilli() }
-            .getOrDefault(System.currentTimeMillis())
 }

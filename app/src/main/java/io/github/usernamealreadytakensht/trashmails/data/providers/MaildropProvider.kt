@@ -12,10 +12,10 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
-import java.time.Instant
 
 /** Maildrop: public GraphQL API, no authentication. */
 class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
@@ -54,7 +54,7 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
                 id = m.getString("id"),
                 from = m.textOrEmpty("headerfrom").ifBlank { m.textOrEmpty("mailfrom") }.replace(WHITESPACE, " "),
                 subject = m.textOrEmpty("subject").replace(WHITESPACE, " "),
-                date = parseDate(m.optString("date")),
+                date = parseIsoDate(m.optString("date"), fallback = 0L),
             )
         }.sortedByDescending { it.date }
     }
@@ -82,7 +82,4 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
         )
         return data.optBoolean("delete")
     }
-
-    private fun parseDate(s: String): Long =
-        runCatching { Instant.parse(s).toEpochMilli() }.getOrDefault(0L)
 }

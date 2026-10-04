@@ -12,6 +12,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.PlainBox
 import io.github.usernamealreadytakensht.trashmails.data.Prefs
+import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
 import io.github.usernamealreadytakensht.trashmails.data.SecretBox
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
@@ -21,7 +22,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.OffsetDateTime
 
 /**
  * DropMail.me: a random address (the login part is the server's) on a chosen or random domain,
@@ -111,7 +111,7 @@ class DropMailProvider(
                 id = id,
                 from = m.text("headerFrom") ?: m.textOrEmpty("fromAddr"),
                 subject = m.textOrEmpty("headerSubject"),
-                date = parseDate(m.optString("receivedAt")),
+                date = parseIsoDate(m.optString("receivedAt")),
                 html = m.text("html"),
                 text = m.text("text"),
                 // Only an extended address is worth showing: the plain one is the inbox itself.
@@ -298,9 +298,6 @@ class DropMailProvider(
     }
 
     private fun quote(s: String): String = JSONObject.quote(s)
-
-    private fun parseDate(iso: String): Long =
-        runCatching { OffsetDateTime.parse(iso).toInstant().toEpochMilli() }.getOrDefault(System.currentTimeMillis())
 
     private fun JSONObject.data(field: String): JSONObject? = optJSONObject("data")?.optJSONObject(field)
     private fun JSONObject.firstError(): JSONObject? = optJSONArray("errors")?.optJSONObject(0)
