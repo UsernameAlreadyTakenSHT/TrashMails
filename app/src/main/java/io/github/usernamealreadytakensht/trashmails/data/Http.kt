@@ -73,11 +73,10 @@ object Http : HttpApi {
     }
 
     private fun read(resp: Response, request: Request): String {
-        val text = resp.body?.let { body ->
-            val source = body.source()
-            if (source.request(MAX_BODY_BYTES + 1)) throw ProviderException("The reply from ${request.url.host} is too large")
-            source.readUtf8()
-        }.orEmpty()
+        // OkHttp 5: a response always has a body (empty when the server sent none).
+        val source = resp.body.source()
+        if (source.request(MAX_BODY_BYTES + 1)) throw ProviderException("The reply from ${request.url.host} is too large")
+        val text = source.readUtf8()
         if (!resp.isSuccessful) throw HttpException(resp.code, request.url.host, text.take(MAX_ERROR_BODY))
         return text
     }
