@@ -17,7 +17,8 @@ import java.net.URLEncoder
 
 /**
  * Inbox Kitten exposes raw Mailgun events.
- * `list?recipient=` is a prefix search: the exact address is filtered client-side.
+ * `list?recipient=` matches every address one of whose hyphen-separated words is the name (3
+ * characters at least, 100 events at most): the exact address is filtered client-side.
  */
 class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
     override val provider = Provider.INBOX_KITTEN

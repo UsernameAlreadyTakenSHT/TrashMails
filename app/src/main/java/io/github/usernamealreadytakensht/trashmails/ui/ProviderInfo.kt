@@ -21,7 +21,9 @@ fun retentionInfo(provider: Provider): RetentionInfo = when (provider) {
             "There is no account: the inbox only exists by its name.",
             "Removing the address only forgets it in this app.",
         ),
-        warning = "Public inbox: anyone who knows the name can read the emails while they exist.",
+        warning = "Public inbox: anyone who knows the name can read the emails while they exist. " +
+            "Its search also matches each part of a name split by hyphens: \"jane-shop\" is found by searching \"shop\". " +
+            "A random name (the default) has no such part.",
     )
     Provider.GUERRILLA_MAIL -> RetentionInfo(
         mails = listOf(
