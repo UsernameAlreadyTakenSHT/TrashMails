@@ -13,6 +13,8 @@ package io.github.usernamealreadytakensht.trashmails.ui
 fun htmlToText(html: String): String {
     val truncated = html.length > MAX_INPUT
     var s = if (truncated) html.substring(0, MAX_INPUT) else html
+    // The stand-ins below must only ever come from spellOutLinks: a sender's own are dropped.
+    s = s.replace(OPEN.toString(), "").replace(CLOSE.toString(), "")
     for (tag in listOf("script", "style", "head")) s = stripBlocks(s, tag)
     s = stripComments(s)
     s = spellOutLinks(s)

@@ -77,6 +77,11 @@ class HtmlTextTest {
     }
 
     @Test
+    fun aSendersOwnBracketStandIns_areDropped() {
+        assertEquals("pay https://evil.example", htmlToText("pay \u0001https://evil.example\u0002"))
+    }
+
+    @Test
     fun hrefAfterTheTag_isNotTaken() {
         assertEquals("a b", htmlToText("<a>a</a> <b href=x>b</b>"))
     }
