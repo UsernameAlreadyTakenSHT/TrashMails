@@ -27,6 +27,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // No snapshot of the app in the recents screen (Android 13+), whatever the screenshot
+        // setting: the system writes that snapshot to disk, codes included, and keeps it after the
+        // address is forgotten. Screenshots taken on purpose still work.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(false)
         // Set before the first frame: the effect below only runs once composed, too late for the recents thumbnail.
         if (vm.settings.blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContent {
