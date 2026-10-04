@@ -378,7 +378,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         }
         messageJob?.cancel()
         error = null
-        val bodyKey = "${inbox.key} ${summary.id}"
+        val bodyKey = inbox.key to summary.id
         // Opened a moment ago: shown at once, no request, no second HTML-to-text pass.
         recentBodies[bodyKey]?.let { content = it; messageLoading = false; return }
         content = null
@@ -398,16 +398,16 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     }
 
     /**
-     * The last bodies opened, by "inbox key, message id": going back to a message just read is
-     * instant. Few and bounded in size (a long body is fetched again), dropped with their message
-     * or address.
+     * The last bodies opened, by inbox key and message id (a pair, so no separator a provider's id
+     * could contain): going back to a message just read is instant. Few and bounded in size (a long
+     * body is fetched again), dropped with their message or address.
      */
-    private val recentBodies = object : LinkedHashMap<String, MailContent>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MailContent>) = size > MAX_RECENT_BODIES
+    private val recentBodies = object : LinkedHashMap<Pair<String, String>, MailContent>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, String>, MailContent>) = size > MAX_RECENT_BODIES
     }
 
     private fun dropRecentBodies(inboxKey: String, messageId: String? = null) {
-        recentBodies.keys.removeAll { key -> if (messageId == null) key.startsWith("$inboxKey ") else key == "$inboxKey $messageId" }
+        recentBodies.keys.removeAll { (inbox, id) -> inbox == inboxKey && (messageId == null || id == messageId) }
     }
 
     private fun cancelMessage() {
