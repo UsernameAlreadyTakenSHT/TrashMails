@@ -57,7 +57,7 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         // Bodies bounded before comparing: a fresh one longer than its stored copy would otherwise
         // always differ from it and rewrite the file at every refresh.
         var next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
-            .map { m -> m.copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
+            .map { m -> m.bounded().copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
         if (next != current) {
             var json = serialize(next)
             // The oldest go first until the address fits its budget (JSON escaping can grow a body).

@@ -21,6 +21,8 @@ import io.github.usernamealreadytakensht.trashmails.data.ReadStore
 import io.github.usernamealreadytakensht.trashmails.data.SharedPrefs
 import io.github.usernamealreadytakensht.trashmails.data.Settings
 import io.github.usernamealreadytakensht.trashmails.data.SettingsStore
+import io.github.usernamealreadytakensht.trashmails.data.bounded
+import io.github.usernamealreadytakensht.trashmails.data.isSane
 import io.github.usernamealreadytakensht.trashmails.data.providers.allProviders
 import io.github.usernamealreadytakensht.trashmails.data.text
 import kotlinx.coroutines.CancellationException
@@ -431,7 +433,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         val list = attempt("Could not refresh", onError = { msg ->
             listProblem = msg
             if (manual) { error = msg; lastFetchError = msg }
-        }) { providerFor(inbox).listMessages(inbox) }
+        }) { providerFor(inbox).listMessages(inbox).filter { it.isSane() }.map { it.bounded() } }
         if (list == null && !listLoaded && messages.isEmpty()) {
             // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
             val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }

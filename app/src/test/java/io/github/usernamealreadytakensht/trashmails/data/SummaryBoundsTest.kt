@@ -1,0 +1,24 @@
+package io.github.usernamealreadytakensht.trashmails.data
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SummaryBoundsTest {
+    @Test
+    fun headersAreBounded_andBidiControlsDropped() {
+        val s = MailSummary(id = "1", from = "evil‮moc.lapyap@x", subject = "s".repeat(500_000), date = 1, to = "a⁦b")
+        val b = s.bounded()
+        assertEquals("evilmoc.lapyap@x", b.from)
+        assertEquals(1_000, b.subject.length)
+        assertEquals("ab", b.to)
+    }
+
+    @Test
+    fun oversizedIdsOrRefs_areNotSane() {
+        assertTrue(MailSummary(id = "abc", from = "", subject = "", date = 1, ref = mapOf("key" to "k")).isSane())
+        assertFalse(MailSummary(id = "x".repeat(5_000), from = "", subject = "", date = 1).isSane())
+        assertFalse(MailSummary(id = "1", from = "", subject = "", date = 1, ref = mapOf("key" to "k".repeat(5_000))).isSane())
+    }
+}

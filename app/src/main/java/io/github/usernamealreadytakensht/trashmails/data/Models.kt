@@ -106,6 +106,26 @@ data class MailSummary(
     val to: String? = null,
 )
 
+/** Longest sender, subject or recipient kept: real ones are far shorter. */
+private const val MAX_HEADER_CHARS = 1_000
+/** Longest id or reference value accepted from a provider. */
+private const val MAX_ID_CHARS = 1_000
+
+/** Bidirectional controls: they make a sender or subject display other than what it is (RLO, isolates, marks). */
+private val BIDI_CONTROLS = Regex("[‎‏‪-‮⁦-⁩]")
+
+private fun String.forHeader() = take(MAX_HEADER_CHARS).replace(BIDI_CONTROLS, "")
+
+/**
+ * The sender-controlled lines of a summary made safe to show and keep: bounded (they travel in
+ * the saved instance state, where a few hundred kilobytes crash the app when it goes to the
+ * background) and without bidirectional controls.
+ */
+fun MailSummary.bounded(): MailSummary = copy(from = from.forHeader(), subject = subject.forHeader(), to = to?.forHeader())
+
+/** False for a summary whose id or reference no real provider would send: dropped rather than kept. */
+fun MailSummary.isSane(): Boolean = id.length <= MAX_ID_CHARS && ref.all { (k, v) -> k.length <= MAX_ID_CHARS && v.length <= MAX_ID_CHARS }
+
 /** A message body. [text] is the provider's plain part, or one derived from [html] by the ViewModel. */
 data class MailContent(val html: String?, val text: String?)
 
