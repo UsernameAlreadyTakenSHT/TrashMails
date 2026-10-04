@@ -433,7 +433,10 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         val list = attempt("Could not refresh", onError = { msg ->
             listProblem = msg
             if (manual) { error = msg; lastFetchError = msg }
-        }) { providerFor(inbox).listMessages(inbox).filter { it.isSane() }.map { it.bounded() } }
+        }) {
+            // Ids deduplicated: the list is keyed by them, and a provider listing one twice would crash it.
+            providerFor(inbox).listMessages(inbox).filter { it.isSane() }.distinctBy { it.id }.map { it.bounded() }
+        }
         if (list == null && !listLoaded && messages.isEmpty()) {
             // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
             val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }

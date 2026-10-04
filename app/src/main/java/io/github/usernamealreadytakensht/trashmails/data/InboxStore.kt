@@ -12,7 +12,9 @@ class InboxStore(private val prefs: Prefs) {
         val raw = prefs.getString(KEY) ?: return emptyList()
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
         // One malformed entry is dropped on its own, not the whole list with it.
+        // Keys deduplicated: the home list is keyed by them, and a duplicate would crash it at every launch.
         return (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
+            .distinctBy { it.key }
     }
 
     fun save(inboxes: List<Inbox>) {
