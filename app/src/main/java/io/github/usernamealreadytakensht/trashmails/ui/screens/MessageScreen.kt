@@ -468,7 +468,7 @@ private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-wid
 
 /** HTML emails rarely declare a viewport; without one the WebView renders them tiny. */
 internal fun withViewport(html: String): String =
-    if (html.contains("name=\"viewport\"", ignoreCase = true)) html else inHead(html, VIEWPORT)
+    if (html.contains("name=\"viewport\"", ignoreCase = true)) html else atStart(html, VIEWPORT)
 
 /**
  * [html] with DNS prefetching off (a `<link rel=dns-prefetch>` or a plain link could otherwise make
@@ -477,22 +477,24 @@ internal fun withViewport(html: String): String =
  * but inline styles and data: images and fonts, a third guard behind the two in [HtmlBody].
  */
 internal fun withPrivacyMeta(html: String, blockRemote: Boolean): String =
-    inHead(html, NO_DNS_PREFETCH + if (blockRemote) BLOCK_ALL_POLICY else "")
+    atStart(html, NO_DNS_PREFETCH + if (blockRemote) BLOCK_ALL_POLICY else "")
 
 private const val NO_DNS_PREFETCH = "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\">"
 private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
     "img-src data:; font-src data:; style-src 'unsafe-inline'; form-action 'none'\">"
 
-/** [meta] placed right after the opening head tag, or before everything when there is none. */
-private fun inHead(html: String, meta: String): String {
-    // Plain scans, no regex: this runs on the main thread, and a `<head[^>]*>` regex is quadratic
-    // on a body of `<head` with no `>` after it (an ANR a sender could trigger).
-    var i = html.indexOf("<head", ignoreCase = true)
-    while (i >= 0) {
-        val next = html.getOrNull(i + 5)
-        if (next == null || next == '>' || next == '/' || next.isWhitespace()) break // not <header
-        i = html.indexOf("<head", i + 5, ignoreCase = true)
+/**
+ * [meta] placed at the very start of the document, after a leading doctype if there is one: the
+ * parser puts it in the (implicit) head whatever follows. Searching for the sender's own `<head>`
+ * instead let them choose where it landed: a `<head>` in a comment, an attribute or a title, or
+ * after some body content, left the meta inert there, policy included.
+ */
+private fun atStart(html: String, meta: String): String {
+    var i = 0
+    while (i < html.length && (html[i] == '﻿' || html[i].isWhitespace())) i++
+    if (html.regionMatches(i, "<!doctype", 0, 9, ignoreCase = true)) {
+        val end = html.indexOf('>', i)
+        if (end >= 0) return html.substring(0, end + 1) + meta + html.substring(end + 1)
     }
-    val end = if (i < 0) -1 else html.indexOf('>', i)
-    return if (end >= 0) html.replaceRange(end + 1, end + 1, meta) else meta + html
+    return meta + html
 }

@@ -8,8 +8,22 @@ class ViewportTest {
     private val meta = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 
     @Test
-    fun insertedAfterTheHeadTag_notAfterHeader() {
-        assertEquals("<html><header>x</header><head lang=en>$meta</head>", withViewport("<html><header>x</header><head lang=en></head>"))
+    fun insertedFirst_orAfterALeadingDoctype() {
+        assertEquals("$meta<html><head lang=en></head>", withViewport("<html><head lang=en></head>"))
+        assertEquals("\uFEFF <!DOCTYPE html>$meta<p>x</p>", withViewport("\uFEFF <!DOCTYPE html><p>x</p>"))
+    }
+
+    @Test
+    fun aSendersHeadCannotChooseWhereThePolicyLands() {
+        // A <head> in a comment, an attribute or a title, or after body content, left the meta inert.
+        for (html in listOf(
+            "<!--<head>--><img src=http://x>",
+            "<p>x</p><head></head><img src=http://x>",
+            "<div title='<head>'></div><img src=http://x>",
+            "<title><head></title><img src=http://x>",
+        )) {
+            assertTrue(html, withPrivacyMeta(html, blockRemote = true).startsWith("<meta http-equiv=\"x-dns-prefetch-control\""))
+        }
     }
 
     @Test
@@ -31,8 +45,8 @@ class ViewportTest {
 
     @Test
     fun privacyMeta_comesFirst_withThePolicyOnlyWhileBlocked() {
-        val blocked = withPrivacyMeta("<head><link rel=dns-prefetch href=//x.evil></head>", blockRemote = true)
-        assertTrue(blocked.startsWith("<head><meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta http-equiv=\"Content-Security-Policy\""))
+        val blocked = withPrivacyMeta("<head><title>t</title></head>", blockRemote = true)
+        assertTrue(blocked.startsWith("<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta http-equiv=\"Content-Security-Policy\""))
         val open = withPrivacyMeta("<p>x</p>", blockRemote = false)
         assertEquals("<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><p>x</p>", open)
     }
