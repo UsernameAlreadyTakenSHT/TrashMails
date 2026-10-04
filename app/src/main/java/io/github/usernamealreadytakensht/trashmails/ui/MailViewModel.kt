@@ -125,6 +125,13 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     /** Last successful listing per inbox key. */
     private val lastFetch = mutableMapOf<String, Fetch>()
     private fun lastFetchAt(inbox: Inbox): Long = lastFetch[inbox.key]?.at ?: 0L
+    /** When each inbox was last asked for, successfully or not (monotonic clock): what throttles refreshes. */
+    private val lastAttempt = mutableMapOf<String, Long>()
+    /** Milliseconds before [inbox] may be listed again on request, 0 when it may be now. */
+    private fun refreshWait(inbox: Inbox): Long {
+        val last = lastAttempt[inbox.key] ?: return 0L
+        return (MANUAL_REFRESH_MIN_MS - (now() - last)).coerceAtLeast(0L)
+    }
     private fun now() = SystemClock.elapsedRealtime()
     /** Addresses whose server-side deletion is in flight; their cards are dimmed and inert. */
     var deleting by mutableStateOf<Set<String>>(emptySet())
@@ -196,7 +203,10 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     fun onForeground() {
         foreground = true
         forgetOldInboxes()
-        (screen as? Screen.InboxDetail)?.inbox?.let { startPolling(it, immediate = providerFor(it).refreshOnForeground) }
+        // At once when the provider needs it, but not more than every 30 s (a rotation is a foreground too).
+        (screen as? Screen.InboxDetail)?.inbox?.let {
+            startPolling(it, immediate = providerFor(it).refreshOnForeground && refreshWait(it) == 0L)
+        }
     }
 
     /** Screen off or another app in front: no request until [onForeground]. */
@@ -232,6 +242,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 providerFor(it).forgetInbox(it)
                 lastFetch.remove(it.key)
                 pendingDeletes.remove(it.key)
+                lastAttempt.remove(it.key)
             }
             inboxes = kept
             forgetEmptiedProviders(old)
@@ -318,6 +329,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         forgetEmptiedProviders(listOf(inbox))
         lastFetch.remove(inbox.key)
         pendingDeletes.remove(inbox.key)
+        lastAttempt.remove(inbox.key)
         unread = unread - inbox.key
         read = read - inbox.key
         saveRead()
@@ -423,8 +435,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
 
     /** Manual refresh, throttled to once per [MANUAL_REFRESH_MIN_MS]; restarts the polling loop. */
     fun refresh(inbox: Inbox) {
-        val last = lastFetchAt(inbox)
-        val wait = if (last == 0L) 0L else MANUAL_REFRESH_MIN_MS - (now() - last)
+        // Counted from the last attempt, not the last success: a failing inbox is no reason to hammer it.
+        val wait = refreshWait(inbox)
         if (wait > 0) {
             notice = "Refreshed less than 30 s ago · try again in ${(wait / 1000) + 1} s"
             return
@@ -438,6 +450,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
      * snackbar at every tick.
      */
     private suspend fun fetch(inbox: Inbox, manual: Boolean) {
+        lastAttempt[inbox.key] = now()
         listLoading = true
         val list = attempt("Could not refresh", onError = { msg ->
             listProblem = msg
