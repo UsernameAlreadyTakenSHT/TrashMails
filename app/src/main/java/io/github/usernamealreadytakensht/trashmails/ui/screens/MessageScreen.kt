@@ -394,9 +394,16 @@ private fun openLink(context: Context, uri: Uri) {
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 
 /** HTML emails rarely declare a viewport; without one the WebView renders them tiny. */
-private fun withViewport(html: String): String {
+internal fun withViewport(html: String): String {
     if (html.contains("name=\"viewport\"", ignoreCase = true)) return html
-    val head = Regex("<head[^>]*>", RegexOption.IGNORE_CASE).find(html)
-    return if (head != null) html.replaceRange(head.range.last + 1, head.range.last + 1, VIEWPORT)
-    else VIEWPORT + html
+    // Plain scans, no regex: this runs on the main thread, and a `<head[^>]*>` regex is quadratic
+    // on a body of `<head` with no `>` after it (an ANR a sender could trigger).
+    var i = html.indexOf("<head", ignoreCase = true)
+    while (i >= 0) {
+        val next = html.getOrNull(i + 5)
+        if (next == null || next == '>' || next == '/' || next.isWhitespace()) break // not <header
+        i = html.indexOf("<head", i + 5, ignoreCase = true)
+    }
+    val end = if (i < 0) -1 else html.indexOf('>', i)
+    return if (end >= 0) html.replaceRange(end + 1, end + 1, VIEWPORT) else VIEWPORT + html
 }
