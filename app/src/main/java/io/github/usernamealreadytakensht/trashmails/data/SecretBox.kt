@@ -31,8 +31,12 @@ object PlainBox : SecretBox {
  * AES-256-GCM with a key that lives in the Android Keystore (hardware-backed where the device has
  * it) and never leaves it: copying the app's files, from a backup tool or a rooted shell, no longer
  * yields the secrets. Sealed values read `k1:` + Base64(IV + ciphertext).
+ *
+ * One object for the whole process: two instances could each find no key and generate one under
+ * the same alias at once, the second replacing the first. The key is looked up or generated once,
+ * under the lazy's lock.
  */
-class KeystoreBox : SecretBox {
+object KeystoreBox : SecretBox {
     private val key: SecretKey by lazy {
         val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (store.getKey(ALIAS, null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
@@ -63,11 +67,9 @@ class KeystoreBox : SecretBox {
         }.getOrNull()
     }
 
-    companion object {
-        const val PREFIX = "k1:"
-        private const val KEYSTORE = "AndroidKeyStore"
-        private const val ALIAS = "trashmails-secrets"
-        private const val TRANSFORMATION = "AES/GCM/NoPadding"
-        private const val IV_BYTES = 12
-    }
+    const val PREFIX = "k1:"
+    private const val KEYSTORE = "AndroidKeyStore"
+    private const val ALIAS = "trashmails-secrets"
+    private const val TRANSFORMATION = "AES/GCM/NoPadding"
+    private const val IV_BYTES = 12
 }

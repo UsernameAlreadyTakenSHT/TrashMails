@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 /** Persistence of created inboxes (SharedPreferences, JSON), their tokens sealed by [box]. */
 class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox) {
-    constructor(context: Context) : this(SharedPrefs(context, "inboxes"), KeystoreBox())
+    constructor(context: Context) : this(SharedPrefs(context, "inboxes"), KeystoreBox)
 
     fun load(): List<Inbox> {
         val raw = prefs.getString(KEY) ?: return emptyList()

@@ -55,7 +55,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val readStore = ReadStore(app)
     /** What the cache-backed providers keep locally: shown when their listing cannot be refreshed. */
     private val cache = MessageCache(app)
-    private val providers: Map<Provider, MailProvider> = allProviders(cache = cache, prefsFor = { SharedPrefs(app, it) }, box = KeystoreBox())
+    private val providers: Map<Provider, MailProvider> = allProviders(cache = cache, prefsFor = { SharedPrefs(app, it) }, box = KeystoreBox)
 
     var inboxes by mutableStateOf(store.load())
         private set
