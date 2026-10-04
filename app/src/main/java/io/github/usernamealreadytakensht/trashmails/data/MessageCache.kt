@@ -30,13 +30,27 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         if (!migrated) { migrated = true; migrate() }
     }
 
-    fun load(inboxKey: String): List<MailSummary> = synchronized(lock) { read(inboxKey) }
+    fun load(inboxKey: String): List<MailSummary> = synchronized(lock) {
+        val kept = read(inboxKey).map { it.first }
+        // Expired entries leave the file as soon as they are seen, not at the next change.
+        if (inboxKey in expired) update(inboxKey) { it } else kept
+    }
 
-    private fun read(inboxKey: String): List<MailSummary> = try {
+    /** Addresses whose file still holds messages [read] found expired. */
+    private val expired = mutableSetOf<String>()
+
+    /** The kept messages of [inboxKey], each with when it was first kept (entries from before 0.5.4 count from now). */
+    private fun read(inboxKey: String): List<Pair<MailSummary, Long>> = try {
         ready()
         val arr = prefs.getString(inboxKey)?.let { JSONArray(it) }
+        val now = System.currentTimeMillis()
         if (arr == null) emptyList()
-        else (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
+        else {
+            val all = (0 until arr.length()).mapNotNull { i ->
+                runCatching { arr.getJSONObject(i).let { o -> fromJson(o) to o.optLong("kept", now) } }.getOrNull()
+            }
+            all.filter { (_, kept) -> kept >= now - MAX_AGE_MS }.also { if (it.size < all.size) expired += inboxKey }
+        }
     } catch (e: Exception) {
         emptyList()
     } catch (e: OutOfMemoryError) {
@@ -53,26 +67,35 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
     fun update(inboxKey: String, change: (List<MailSummary>) -> List<MailSummary>): List<MailSummary> = synchronized(lock) {
         // A reply still in flight when its address was removed must not write it back.
         if (inboxKey in forgotten) return emptyList()
-        val current = read(inboxKey)
+        val entries = read(inboxKey)
+        val current = entries.map { it.first }
+        val keptAt = entries.associate { (m, kept) -> m.id to kept }
         // Bodies bounded before comparing: a fresh one longer than its stored copy would otherwise
         // always differ from it and rewrite the file at every refresh.
         var next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
             .map { m -> m.bounded().copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
-        if (next != current) {
-            var json = serialize(next)
+        val purge = expired.remove(inboxKey)
+        if (next != current || purge) {
+            val now = System.currentTimeMillis()
+            var json = serialize(next, keptAt, now)
             // The oldest go first until the address fits its budget (JSON escaping can grow a body).
             while (json.length > MAX_FILE_CHARS && next.isNotEmpty()) {
                 next = next.dropLast(1)
-                json = serialize(next)
+                json = serialize(next, keptAt, now)
             }
             prefs.put(inboxKey to json)
         }
         next
     }
 
-    private fun serialize(list: List<MailSummary>): String {
+    /**
+     * Each message with the time it was first kept: [read] drops it [MAX_AGE_MS] later. That time is
+     * the app's, not the email's date, which the sender sets (an old one would drop it at once, one
+     * in the future would keep it for ever).
+     */
+    private fun serialize(list: List<MailSummary>, keptAt: Map<String, Long>, now: Long): String {
         val arr = JSONArray()
-        list.forEach { arr.put(toJson(it)) }
+        list.forEach { arr.put(toJson(it).put("kept", keptAt[it.id] ?: now)) }
         return arr.toString()
     }
 
@@ -127,5 +150,7 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         const val MAX_BODY_CHARS = 64 * 1024
         /** What one address may take on disk and in memory once parsed, all messages together. */
         const val MAX_FILE_CHARS = 2 * 1024 * 1024
+        /** Kept emails go this long after the app kept them: they hold codes and sign-in links long expired. */
+        const val MAX_AGE_MS = 7 * 24 * 3_600_000L
     }
 }

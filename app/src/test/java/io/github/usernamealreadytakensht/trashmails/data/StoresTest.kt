@@ -159,6 +159,15 @@ class MessageCacheTest {
     }
 
     @Test
+    fun aMessageKeptOverAWeek_isDropped_fromTheFileToo() {
+        val week = 7 * 24 * 3_600_000L
+        prefs.put("k" to """[{"id":"old","from":"","subject":"","date":$now,"kept":${now - week - 1}},
+            {"id":"new","from":"","subject":"","date":1,"kept":$now}]""")
+        assertEquals(listOf("new"), cache.load("k").map { it.id })
+        assertTrue(prefs.getString("k")!!.contains("\"new\"") && !prefs.getString("k")!!.contains("\"old\""))
+    }
+
+    @Test
     fun aDamagedFile_readsAsEmpty() {
         prefs.put("k" to "[{\"id\":")
         assertTrue(cache.load("k").isEmpty())
