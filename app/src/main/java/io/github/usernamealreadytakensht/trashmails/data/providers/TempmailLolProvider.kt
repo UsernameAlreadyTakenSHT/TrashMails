@@ -18,6 +18,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.security.MessageDigest
 
 /**
  * tempmail.lol: a private inbox behind a token, on a random domain (and, unless asked otherwise, a
@@ -75,7 +76,9 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
             val html = m.text("html")
             MailSummary(
                 // The API gives no id: one is derived from what the message is, stable across fetches.
-                id = "$date-${(from + subject + (text ?: html.orEmpty())).hashCode().toUInt().toString(16)}",
+                // 64 bits of SHA-256 over separated fields: a 32-bit hashCode let a sender forge a
+                // message with the same date and hash, which then took the place of the real one.
+                id = "$date-${contentHash(from, subject, text.orEmpty(), html.orEmpty())}",
                 from = from, subject = subject, date = date, html = html, text = text,
             )
         }
@@ -98,6 +101,12 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
     }
 
     override fun forgetInbox(inbox: Inbox) = cache.clear(inbox.key)
+
+    /** The first 64 bits of the SHA-256 of [parts], NUL-separated, in hex. */
+    private fun contentHash(vararg parts: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(parts.joinToString("\u0000").toByteArray())
+        return digest.take(8).joinToString("") { "%02x".format(it) }
+    }
 
     /** The `error` line of a failed reply, when there is one. */
     private fun explain(body: String): String? =
