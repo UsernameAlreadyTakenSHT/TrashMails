@@ -12,6 +12,7 @@ import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.CreationQuota
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.InboxStore
+import io.github.usernamealreadytakensht.trashmails.data.KeystoreBox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
@@ -53,7 +54,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private val readStore = ReadStore(app)
     /** What the cache-backed providers keep locally: shown when their listing cannot be refreshed. */
     private val cache = MessageCache(app)
-    private val providers: Map<Provider, MailProvider> = allProviders(cache = cache, prefsFor = { SharedPrefs(app, it) })
+    private val providers: Map<Provider, MailProvider> = allProviders(cache = cache, prefsFor = { SharedPrefs(app, it) }, box = KeystoreBox())
 
     var inboxes by mutableStateOf(store.load())
         private set

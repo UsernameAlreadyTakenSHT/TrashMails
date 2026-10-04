@@ -10,7 +10,9 @@ import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
+import io.github.usernamealreadytakensht.trashmails.data.PlainBox
 import io.github.usernamealreadytakensht.trashmails.data.Prefs
+import io.github.usernamealreadytakensht.trashmails.data.SecretBox
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
@@ -35,6 +37,8 @@ class DropMailProvider(
     private val http: HttpApi = Http,
     private val cache: MessageCache,
     private val prefs: Prefs,
+    /** Seals the device token and the restore keys before they reach [prefs]. */
+    private val box: SecretBox = PlainBox,
 ) : MailProvider {
     override val provider = Provider.DROPMAIL
 
@@ -235,7 +239,7 @@ class DropMailProvider(
 
     /** The device's `af_` token, requested when there is none or it is about to run out. */
     private suspend fun token(): String {
-        val stored = prefs.getString(KEY_TOKEN)
+        val stored = prefs.getString(KEY_TOKEN)?.takeIf { it.isNotBlank() }?.let(box::open)
         val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: 0L
         if (!stored.isNullOrBlank() && expiresAt - System.currentTimeMillis() > TOKEN_MARGIN_MS) return stored
         val json = try {
@@ -250,7 +254,7 @@ class DropMailProvider(
         val token = json.text("token") ?: throw ProviderException("DropMail.me sent no token")
         // It goes into the URL path as is: nothing but the token's own characters may get there.
         if (!TOKEN_FORMAT.matches(token)) throw ProviderException("DropMail.me sent a token the app cannot use")
-        prefs.put(KEY_TOKEN to token, KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
+        prefs.put(KEY_TOKEN to box.seal(token), KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
         return token
     }
 
@@ -260,7 +264,7 @@ class DropMailProvider(
     /** The current session id (null when none was ever stored) and restore key of [inbox]. */
     private fun loadSession(inbox: Inbox): Pair<String?, String> {
         val o = prefs.getString(sessionKey(inbox))?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val restoreKey = o?.optString("restoreKey")?.takeIf { it.isNotBlank() } ?: inbox.token
+        val restoreKey = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }?.let(box::open) ?: inbox.token
             ?: throw ProviderException("Missing restore key")
         return o?.optString("session")?.takeIf { it.isNotBlank() } to restoreKey
     }
@@ -269,7 +273,7 @@ class DropMailProvider(
     private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) {
         // Checked and written as one step under the cache lock, so it cannot land just after the removal.
         cache.unlessForgotten(inbox.key) {
-            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", restoreKey).toString())
+            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", box.seal(restoreKey)).toString())
         }
     }
 

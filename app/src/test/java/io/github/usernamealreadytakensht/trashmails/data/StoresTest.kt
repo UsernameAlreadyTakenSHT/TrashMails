@@ -31,6 +31,33 @@ class InboxStoreTest {
         assertEquals(inboxes, store.load())
     }
 
+    /** Reverses the secret behind the sealed prefix: enough to see what is sealed and what is not. */
+    private val reversing = object : SecretBox {
+        override fun seal(plain: String) = "k1:" + plain.reversed()
+        override fun open(stored: String) = if (stored.startsWith("k1:")) stored.removePrefix("k1:").reversed() else stored
+    }
+
+    @Test
+    fun tokensAreSealed_andClearOnesFromBeforeAreSealedOnLoad() {
+        prefs.put("list" to """[{"id":"a","provider":"MAIL_TM","address":"a@mail.tm","token":"pw","createdAt":1}]""")
+        val sealing = InboxStore(prefs, reversing)
+        assertEquals("pw", sealing.load().single().token)
+        val stored = prefs.getString("list")!!
+        assertTrue(stored.contains("k1:wp") && !stored.contains("\"pw\""))
+        assertEquals("pw", sealing.load().single().token)
+    }
+
+    @Test
+    fun aTokenThatCannotBeOpened_costsOnlyThatAddressItsAccess() {
+        val failing = object : SecretBox {
+            override fun seal(plain: String) = "k1:x"
+            override fun open(stored: String): String? = null
+        }
+        val sealing = InboxStore(prefs, failing)
+        sealing.save(listOf(Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw", createdAt = 1L)))
+        assertEquals(listOf(Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = null, createdAt = 1L)), sealing.load())
+    }
+
     @Test
     fun aMalformedEntryIsDroppedAlone_andAGuerrillaTokenIsNotKeptAround() {
         prefs.put("list" to """[{"id":"x","provider":"MAILDROP","address":"x@maildrop.cc","createdAt":5},{"provider":"NOPE"},{"id":"g","provider":"GUERRILLA_MAIL","address":"g@guerrillamailblock.com","token":"oldsid","createdAt":6},{"nonsense":true}]""")

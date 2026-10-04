@@ -1,0 +1,73 @@
+package io.github.usernamealreadytakensht.trashmails.data
+
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import java.security.KeyStore
+import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+
+/**
+ * Seals the secrets the app stores (a mail.tm password, inbox tokens, DropMail.me restore keys and
+ * device token) before they reach a preferences file, and opens them back. Only those values are
+ * sealed, never a whole list: should the key be lost, one address loses its access, not the app
+ * its addresses.
+ */
+interface SecretBox {
+    fun seal(plain: String): String
+    /** The secret, or null when it cannot be opened. A value stored before sealing existed comes back as is. */
+    fun open(stored: String): String?
+}
+
+/** No sealing: the JVM tests, and the fallback where the keystore is unusable. */
+object PlainBox : SecretBox {
+    override fun seal(plain: String) = plain
+    override fun open(stored: String): String? = if (stored.startsWith(KeystoreBox.PREFIX)) null else stored
+}
+
+/**
+ * AES-256-GCM with a key that lives in the Android Keystore (hardware-backed where the device has
+ * it) and never leaves it: copying the app's files, from a backup tool or a rooted shell, no longer
+ * yields the secrets. Sealed values read `k1:` + Base64(IV + ciphertext).
+ */
+class KeystoreBox : SecretBox {
+    private val key: SecretKey by lazy {
+        val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+        (store.getKey(ALIAS, null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
+            init(
+                KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build()
+            )
+            generateKey()
+        }
+    }
+
+    /** Sealed, or as is if the keystore fails (some devices): never worse than before sealing existed. */
+    override fun seal(plain: String): String = runCatching {
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key) }
+        PREFIX + Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(plain.toByteArray()))
+    }.getOrDefault(plain)
+
+    override fun open(stored: String): String? {
+        if (!stored.startsWith(PREFIX)) return stored
+        return runCatching {
+            val bytes = Base64.getDecoder().decode(stored.removePrefix(PREFIX))
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes, 0, IV_BYTES))
+            String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES))
+        }.getOrNull()
+    }
+
+    companion object {
+        const val PREFIX = "k1:"
+        private const val KEYSTORE = "AndroidKeyStore"
+        private const val ALIAS = "trashmails-secrets"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val IV_BYTES = 12
+    }
+}
