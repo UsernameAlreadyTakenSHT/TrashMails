@@ -101,11 +101,12 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     /**
-     * A listing reply that really is [inbox]'s: it carries `list`, and the name in `email` (when
-     * present) is the inbox name — the domain is the API's own, the address may be an alias.
+     * A listing reply that really is [inbox]'s: it carries `list`, and the name in `email` is
+     * the inbox name — the domain is the API's own, the address may be an alias.
      */
     private fun JSONObject.isListingOf(inbox: Inbox): Boolean =
-        has("list") && optString("email").substringBefore('@').let { it.isBlank() || it.equals(inbox.id, ignoreCase = true) }
+        // The name must be there: a reply without it cannot be told from another inbox's.
+        has("list") && optString("email").substringBefore('@').let { it.isNotBlank() && it.equals(inbox.id, ignoreCase = true) }
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
         val json = withSid(inbox) { sid ->
