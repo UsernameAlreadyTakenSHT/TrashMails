@@ -64,6 +64,9 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
      */
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> = withContext(NonCancellable) {
         val token = inbox.token ?: throw ProviderException("Missing token")
+        // In the query because the API takes it nowhere else (in an Authorization or any other
+        // header it answers "Expected token in query parameter", checked October 2026): it reaches
+        // the server's logs, but only over TLS, and no Referer ever carries it.
         val json = JSONObject(http.get("$BASE/inbox?token=${URLEncoder.encode(token, "UTF-8")}"))
         val arr = json.optJSONArray("emails")
         // An expired inbox (or a reply without emails) only means nothing new: what was received stays.
