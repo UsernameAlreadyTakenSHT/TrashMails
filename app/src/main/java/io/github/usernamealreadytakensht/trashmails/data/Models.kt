@@ -151,6 +151,9 @@ interface MailProvider {
     /** The app forgets [inbox]: anything the provider kept for it locally goes too. */
     fun forgetInbox(inbox: Inbox) {}
 
+    /** The app holds no address of this provider any more: what the provider kept for all of them goes. */
+    fun forgetAll() {}
+
     /** One line the user should hear about what the last call did (an address restored), handed over once. */
     fun takeNotice(): String? = null
 

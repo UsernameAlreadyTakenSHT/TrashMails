@@ -135,6 +135,12 @@ class DropMailProvider(
         return true
     }
 
+    /**
+     * The device token goes with the last address: whoever read it from the app's files could
+     * otherwise list its sessions, and so the restore keys of addresses already removed.
+     */
+    override fun forgetAll() = prefs.remove(KEY_TOKEN, KEY_TOKEN_EXPIRES)
+
     override fun forgetInbox(inbox: Inbox) {
         cache.clear(inbox.key)
         prefs.remove(sessionKey(inbox), deletedKey(inbox))

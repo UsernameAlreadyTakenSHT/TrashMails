@@ -234,6 +234,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 pendingDeletes.remove(it.key)
             }
             inboxes = kept
+            forgetEmptiedProviders(old)
             unread = unread.filterKeys { key -> kept.any { it.key == key } }
             read = read.filterKeys { key -> kept.any { it.key == key } }
             saveRead()
@@ -304,9 +305,17 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         }
     }
 
+    /** The providers of [removed] that have no address left in [inboxes] drop what they kept for all of them. */
+    private fun forgetEmptiedProviders(removed: List<Inbox>) {
+        removed.map { it.provider }.distinct()
+            .filter { p -> inboxes.none { it.provider == p } }
+            .forEach { providers.getValue(it).forgetAll() }
+    }
+
     private fun forget(inbox: Inbox) {
         providerFor(inbox).forgetInbox(inbox)
         inboxes = inboxes.filterNot { it.key == inbox.key }
+        forgetEmptiedProviders(listOf(inbox))
         lastFetch.remove(inbox.key)
         pendingDeletes.remove(inbox.key)
         unread = unread - inbox.key
