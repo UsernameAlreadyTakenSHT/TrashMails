@@ -33,6 +33,8 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
         const val BASE = "https://api.mail.tm"
         /** Pages of 30 read per refresh: 150 messages, far more than a disposable inbox gets. */
         const val MAX_PAGES = 5
+        /** Messages kept from a listing: five full pages. */
+        const val MAX_MESSAGES = 150
     }
 
 
@@ -105,25 +107,28 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
      * so mail beyond the 30th never showed. At most [MAX_PAGES] pages per refresh.
      */
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val members = mutableListOf<JSONObject>()
+        // Each page is turned into summaries as it comes, and no more than a normal inbox holds is
+        // kept: five raw pages held at once let a hostile server fill memory with tiny objects.
+        val summaries = mutableListOf<MailSummary>()
         var page = 1
         while (true) {
             val json = authed(inbox) { h -> JSONObject(http.get("$BASE/messages?page=$page", h)) }
             val arr = json.optJSONArray("hydra:member") ?: break
-            (0 until arr.length()).forEach { members += arr.getJSONObject(it) }
-            val total = json.optInt("hydra:totalItems", members.size)
-            if (arr.length() == 0 || members.size >= total || page >= MAX_PAGES) break
+            for (i in 0 until minOf(arr.length(), MAX_MESSAGES - summaries.size)) {
+                val m = arr.getJSONObject(i)
+                val from = m.optJSONObject("from")
+                summaries += MailSummary(
+                    id = m.getString("id"),
+                    from = from?.optString("address").orEmpty().ifBlank { from?.optString("name").orEmpty() },
+                    subject = m.textOrEmpty("subject"),
+                    date = parseIsoDate(m.optString("createdAt")),
+                )
+            }
+            val total = json.optInt("hydra:totalItems", summaries.size)
+            if (arr.length() == 0 || summaries.size >= minOf(total, MAX_MESSAGES) || page >= MAX_PAGES) break
             page++
         }
-        return members.map { m ->
-            val from = m.optJSONObject("from")
-            MailSummary(
-                id = m.getString("id"),
-                from = from?.optString("address").orEmpty().ifBlank { from?.optString("name").orEmpty() },
-                subject = m.textOrEmpty("subject"),
-                date = parseIsoDate(m.optString("createdAt")),
-            )
-        }.sortedByDescending { it.date }
+        return summaries.sortedByDescending { it.date }
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
