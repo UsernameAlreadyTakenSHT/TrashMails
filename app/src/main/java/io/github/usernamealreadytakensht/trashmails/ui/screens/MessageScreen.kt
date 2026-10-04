@@ -213,6 +213,9 @@ fun MessageScreen(
 private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""")
 private const val URL_TRAIL = ".,;:!?)]}>'\""
 
+/** Most links made tappable in a plain body. */
+private const val MAX_LINKS = 500
+
 /** Beyond this many characters the plain body is cut, with a button to lay out the rest. */
 private const val PLAIN_BODY_PREVIEW = 200_000
 
@@ -228,7 +231,9 @@ private fun PlainBody(fullText: String, onLink: (Uri) -> Unit) {
     val annotated = remember(text, linkStyle) {
         buildAnnotatedString {
             var last = 0
-            for (m in URL_IN_TEXT.findAll(text)) {
+            // Bounded: each link is a span built and laid out on the main thread, and a sender can
+            // send thousands; past the limit the addresses stay as plain text.
+            for (m in URL_IN_TEXT.findAll(text).take(MAX_LINKS)) {
                 val url = m.value.trimEnd { it in URL_TRAIL }
                 if (url.length < 10) continue
                 append(text, last, m.range.first)
