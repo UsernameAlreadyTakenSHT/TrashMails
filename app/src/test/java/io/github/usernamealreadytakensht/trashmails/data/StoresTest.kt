@@ -48,6 +48,23 @@ class InboxStoreTest {
     }
 
     @Test
+    fun aKeystoreFailingForAMoment_losesNoToken() {
+        var failing = true
+        val flaky = object : SecretBox {
+            override fun seal(plain: String) = reversing.seal(plain)
+            override fun open(stored: String) = if (failing) null else reversing.open(stored)
+        }
+        InboxStore(prefs, reversing).save(listOf(Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw", createdAt = 1L)))
+        // Loaded while the keystore fails, then saved (an address created meanwhile).
+        val store = InboxStore(prefs, flaky)
+        val loaded = store.load()
+        assertEquals(null, loaded.single().token)
+        store.save(loaded + Inbox("b", Provider.MAILDROP, "b@maildrop.cc", createdAt = 2L))
+        failing = false
+        assertEquals("pw", InboxStore(prefs, flaky).load().first { it.id == "a" }.token)
+    }
+
+    @Test
     fun aTokenThatCannotBeOpened_costsOnlyThatAddressItsAccess() {
         val failing = object : SecretBox {
             override fun seal(plain: String) = "k1:x"
