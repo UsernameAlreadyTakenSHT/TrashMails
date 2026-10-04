@@ -59,6 +59,10 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        // kotlinx-coroutines' debug-agent data: unused in the app.
+        resources.excludes += "DebugProbesKt.bin"
+    }
 }
 
 dependencies {
