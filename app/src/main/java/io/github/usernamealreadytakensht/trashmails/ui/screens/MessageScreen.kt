@@ -291,8 +291,9 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
     // Follow the app theme (which may override the system one), not the system setting.
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val background = MaterialTheme.colorScheme.surface.toArgb()
-    // Reload only when the content or the image policy changes, not on every recomposition.
-    val key = html.hashCode() to loadImages
+    // Reload only when the content or the image policy changes, not on every recomposition. The content
+    // itself, not its hash: two bodies with the same hashCode are easy to make.
+    val key = html to loadImages
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
