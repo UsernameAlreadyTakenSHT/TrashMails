@@ -5,6 +5,7 @@ import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.pathSegment
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -17,7 +18,6 @@ import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URLEncoder
 import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
 
@@ -33,8 +33,6 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
         const val BASE = "https://api.mail.tm"
     }
 
-    /** Ids come from the server: encoded so one can never change the path (`../accounts/x`). */
-    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** JWT per inbox id, for this process lifetime. */
     private val jwts = ConcurrentHashMap<String, String>()
@@ -116,7 +114,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
-        val m = authed(inbox) { h -> JSONObject(http.get("$BASE/messages/${enc(summary.id)}", h)) }
+        val m = authed(inbox) { h -> JSONObject(http.get("$BASE/messages/${pathSegment(summary.id)}", h)) }
         // `html` is documented as a list of parts; be tolerant if it ever comes as one string.
         val html = when (val h = m.opt("html")) {
             is JSONArray -> (0 until h.length()).joinToString("\n") { h.optString(it) }
@@ -129,7 +127,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
     override val canDeleteMessages get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
-        authed(inbox) { h -> http.delete("$BASE/messages/${enc(summary.id)}", h) }
+        authed(inbox) { h -> http.delete("$BASE/messages/${pathSegment(summary.id)}", h) }
         return true
     }
 
@@ -142,7 +140,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
      */
     override suspend fun deleteInbox(inbox: Inbox): Boolean {
         try {
-            authed(inbox) { h -> http.delete("$BASE/accounts/${enc(inbox.id)}", h) }
+            authed(inbox) { h -> http.delete("$BASE/accounts/${pathSegment(inbox.id)}", h) }
         } catch (e: AccountGoneException) {
             // Nothing left to delete.
         } catch (e: HttpException) {

@@ -221,7 +221,7 @@ class DropMailCacheRaceTest {
         lateinit var provider: DropMailProvider
         lateinit var victim: MailSummary
         // The server still lists the message the user deletes while the second listing is in flight.
-        val http = FakeHttp().on("/api/token/generate", body("""{"token":"af_x"}""")).onBody(
+        val http = FakeHttp().on("/api/token/generate", body("""{"token":"af_testtokenx"}""")).onBody(
             "session(id:",
             fixture("dropmail_session"),
             { runBlocking { provider.deleteMessage(inbox, victim) }; fixture("dropmail_session")() },

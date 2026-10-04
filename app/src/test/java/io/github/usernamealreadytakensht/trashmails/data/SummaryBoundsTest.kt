@@ -24,6 +24,12 @@ class SummaryBoundsTest {
     }
 
     @Test
+    fun pathSegments_cannotWalkThePath() {
+        assertEquals("a%2F..%2Fb%20c", pathSegment("a/../b c"))
+        for (bad in listOf("", ".", "..")) assertTrue(runCatching { pathSegment(bad) }.isFailure)
+    }
+
+    @Test
     fun oversizedIdsOrRefs_areNotSane() {
         assertTrue(MailSummary(id = "abc", from = "", subject = "", date = 1, ref = mapOf("key" to "k")).isSane())
         assertFalse(MailSummary(id = "x".repeat(5_000), from = "", subject = "", date = 1).isSane())

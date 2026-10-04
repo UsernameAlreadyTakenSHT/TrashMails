@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.pathSegment
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -13,7 +14,6 @@ import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
-import java.net.URLEncoder
 
 /**
  * Burner Kiwi: the address is generated server-side and a JWT token protects the inbox.
@@ -55,7 +55,7 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
         mapOf("X-Burner-Key" to (inbox.token ?: throw ProviderException("Missing token")))
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val json = unwrap(http.get("$BASE/${URLEncoder.encode(inbox.id, "UTF-8")}/messages", headers(inbox)))
+        val json = unwrap(http.get("$BASE/${pathSegment(inbox.id)}/messages", headers(inbox)))
         val arr = json.optJSONArray("result") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)

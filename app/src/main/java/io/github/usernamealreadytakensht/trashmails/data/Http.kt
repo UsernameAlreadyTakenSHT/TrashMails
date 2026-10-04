@@ -9,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+import java.net.URLEncoder
 import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
@@ -101,6 +102,16 @@ fun sanitizeName(raw: String?): String? =
         ?.replace(Regex("""\.{2,}"""), ".")
         ?.trim('.')
         ?.takeIf { it.isNotBlank() }
+
+/**
+ * A server-provided id as one URL path segment. Percent-encoding keeps it from adding segments
+ * (`/`) or a query, but `.` and `..` would still be resolved as dot segments (`messages/..` is the
+ * API root): those are refused. A space is `%20`, not URLEncoder's `+` (meant for forms).
+ */
+fun pathSegment(id: String): String {
+    if (id.isEmpty() || id == "." || id == "..") throw ProviderException("Unexpected id from the server")
+    return URLEncoder.encode(id, "UTF-8").replace("+", "%20")
+}
 
 private val ADDRESS = Regex("""[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}){1,8}""")
 

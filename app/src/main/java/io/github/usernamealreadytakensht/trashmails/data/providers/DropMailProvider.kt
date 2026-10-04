@@ -47,6 +47,7 @@ class DropMailProvider(
         /** A token younger than this is not replaced on a 403: the refusal is more likely a firewall than the token. */
         const val TOKEN_MIN_AGE_MS = 3_600_000L
         const val MAX_TOMBSTONES = 200
+        val TOKEN_FORMAT = Regex("af_[A-Za-z0-9_-]{8,256}")
         const val KEY_TOKEN = "token"
         const val KEY_TOKEN_EXPIRES = "tokenExpiresAt"
         const val MAIL_FIELDS = "id receivedAt fromAddr headerFrom headerSubject text html toAddr toAddrOrig"
@@ -247,6 +248,8 @@ class DropMailProvider(
             )
         }
         val token = json.text("token") ?: throw ProviderException("DropMail.me sent no token")
+        // It goes into the URL path as is: nothing but the token's own characters may get there.
+        if (!TOKEN_FORMAT.matches(token)) throw ProviderException("DropMail.me sent a token the app cannot use")
         prefs.put(KEY_TOKEN to token, KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
         return token
     }
