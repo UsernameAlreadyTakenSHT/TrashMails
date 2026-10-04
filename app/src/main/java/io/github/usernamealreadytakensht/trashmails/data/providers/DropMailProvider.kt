@@ -142,8 +142,8 @@ class DropMailProvider(
     override fun forgetAll() = prefs.remove(KEY_TOKEN, KEY_TOKEN_EXPIRES)
 
     override fun forgetInbox(inbox: Inbox) {
-        cache.clear(inbox.key)
-        prefs.remove(sessionKey(inbox), deletedKey(inbox))
+        // One step under the cache lock: a restoration in flight cannot save its session in between.
+        cache.clear(inbox.key) { prefs.remove(sessionKey(inbox), deletedKey(inbox)) }
     }
 
     /**
@@ -263,8 +263,10 @@ class DropMailProvider(
 
     /** Not for an address removed while its restoration was in flight: removing it drops all of it. */
     private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) {
-        if (cache.isForgotten(inbox.key)) return
-        prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", restoreKey).toString())
+        // Checked and written as one step under the cache lock, so it cannot land just after the removal.
+        cache.unlessForgotten(inbox.key) {
+            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", restoreKey).toString())
+        }
     }
 
     /** Ids of the messages deleted locally while the server may still list them. */

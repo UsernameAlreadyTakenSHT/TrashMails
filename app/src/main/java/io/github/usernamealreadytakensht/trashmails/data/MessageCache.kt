@@ -99,12 +99,22 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         return arr.toString()
     }
 
-    /** Drops what is kept for [inboxKey], for good: the address was removed. */
-    fun clear(inboxKey: String) {
+    /**
+     * Drops what is kept for [inboxKey] for good (the address was removed), and runs [alsoDrop]
+     * under the same lock: a provider dropping its own entries for the address with it cannot be
+     * raced by a write of theirs made through [unlessForgotten].
+     */
+    fun clear(inboxKey: String, alsoDrop: () -> Unit = {}) {
         synchronized(lock) {
             forgotten += inboxKey
             runCatching { ready(); prefs.remove(inboxKey) }
+            alsoDrop()
         }
+    }
+
+    /** Runs [block] unless [inboxKey] was cleared, under the cache lock: never between a clear and its [clear] `alsoDrop`. */
+    fun unlessForgotten(inboxKey: String, block: () -> Unit) {
+        synchronized(lock) { if (inboxKey !in forgotten) block() }
     }
 
     /** True once [clear] ran for [inboxKey]: whatever a reply still in flight brings is dropped. */
