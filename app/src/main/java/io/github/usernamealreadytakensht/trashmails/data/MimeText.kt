@@ -12,10 +12,18 @@ object MimeText {
     /** The readable parts of a message; either may be missing. */
     data class Parts(val text: String?, val html: String?)
 
-    fun parse(raw: String): Parts = parseEntity(raw.replace("\r\n", "\n"), 0)
+    /**
+     * Every multipart level copies what it walks, and the copies live until the walk is done: the
+     * message is bounded to [MAX_RAW] characters and the nesting to [MAX_DEPTH], so a crafted
+     * message cannot multiply an 8 MiB reply into an out-of-memory crash.
+     */
+    fun parse(raw: String): Parts = parseEntity(raw.take(MAX_RAW).replace("\r\n", "\n"), 0)
+
+    /** Largest raw message parsed (attachments beyond it are lost, the text parts come first in practice). */
+    private const val MAX_RAW = 1 shl 20
 
     /** Deepest multipart nesting walked: real mail stays within three or four, a crafted one could nest thousands. */
-    private const val MAX_DEPTH = 8
+    private const val MAX_DEPTH = 5
 
     private fun parseEntity(entity: String, depth: Int): Parts {
         val split = entity.indexOf("\n\n")

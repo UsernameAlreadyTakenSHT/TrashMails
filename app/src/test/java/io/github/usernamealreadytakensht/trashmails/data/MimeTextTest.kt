@@ -84,6 +84,16 @@ class MimeTextTest {
     }
 
     @Test
+    fun aHugeNestedMessage_isParsedWithinBounds() {
+        val raw = StringBuilder()
+        repeat(5) { raw.append("Content-Type: multipart/mixed; boundary=b${it}x\n\n--b${it}x\n") }
+        raw.append("Content-Type: text/plain\n\nfound\n").append("y".repeat(8 shl 20))
+        val text = MimeText.parse(raw.toString()).text
+        assertTrue(text!!.startsWith("found"))
+        assertTrue(text.length < 1 shl 20)
+    }
+
+    @Test
     fun nestingWithinTheLimit_isWalked() {
         val raw = StringBuilder()
         repeat(5) { raw.append("Content-Type: multipart/mixed; boundary=b${it}x\n\n--b${it}x\n") }
