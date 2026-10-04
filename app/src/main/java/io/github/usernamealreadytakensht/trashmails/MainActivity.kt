@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails
 import android.app.UiModeManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
         // address is forgotten. Screenshots taken on purpose still work.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(false)
         // Set before the first frame: the effect below only runs once composed, too late for the recents thumbnail.
-        if (vm.settings.blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenProtection(vm.settings.blockScreenshots)
         // Once per process, before any mail view exists: what an earlier run's WebView left on disk goes.
         if (!webViewTracesCleared) {
             webViewTracesCleared = true
@@ -46,10 +47,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             // FLAG_SECURE follows the setting live, so toggling it needs no restart.
             val blockScreenshots = vm.settings.blockScreenshots
-            LaunchedEffect(blockScreenshots) {
-                if (blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            }
+            LaunchedEffect(blockScreenshots) { applyScreenProtection(blockScreenshots) }
             val theme = vm.settings.theme
             LaunchedEffect(theme) { applyNightMode(theme) }
             TrashMailsTheme(
@@ -67,6 +65,21 @@ class MainActivity : ComponentActivity() {
      * background, the values-night resources and the message WebView switch with it; before that
      * only the Compose colours do.
      */
+    /**
+     * "Block screenshots": FLAG_SECURE keeps the screen out of captures and recordings, and from
+     * Android 14 the content is also withheld from accessibility services that are not
+     * accessibility tools (which FLAG_SECURE does not stop); TalkBack and the like still read it.
+     */
+    private fun applyScreenProtection(block: Boolean) {
+        if (block) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            window.decorView.setAccessibilityDataSensitive(
+                if (block) View.ACCESSIBILITY_DATA_SENSITIVE_YES else View.ACCESSIBILITY_DATA_SENSITIVE_AUTO,
+            )
+        }
+    }
+
     private fun applyNightMode(theme: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val manager = getSystemService(UiModeManager::class.java) ?: return
