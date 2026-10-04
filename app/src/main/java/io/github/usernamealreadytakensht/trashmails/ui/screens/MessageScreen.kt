@@ -316,7 +316,7 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                 view.tag = key
                 view.settings.blockNetworkLoads = !loadImages
                 (view.webViewClient as MailWebViewClient).blockRemote = !loadImages
-                view.loadDataWithBaseURL(null, withViewport(html), "text/html", "utf-8", null)
+                view.loadDataWithBaseURL(null, withPrivacyMeta(withViewport(html), blockRemote = !loadImages), "text/html", "utf-8", null)
             }
         },
         // Leaving the message (or switching to plain text) frees the renderer at once.
@@ -467,8 +467,24 @@ internal fun plainMailto(mailto: String): String {
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 
 /** HTML emails rarely declare a viewport; without one the WebView renders them tiny. */
-internal fun withViewport(html: String): String {
-    if (html.contains("name=\"viewport\"", ignoreCase = true)) return html
+internal fun withViewport(html: String): String =
+    if (html.contains("name=\"viewport\"", ignoreCase = true)) html else inHead(html, VIEWPORT)
+
+/**
+ * [html] with DNS prefetching off (a `<link rel=dns-prefetch>` or a plain link could otherwise make
+ * Chromium resolve the sender's host while nothing is loaded, telling their DNS server the mail was
+ * opened; once off it cannot be turned back on) and, while [blockRemote], a policy allowing nothing
+ * but inline styles and data: images and fonts, a third guard behind the two in [HtmlBody].
+ */
+internal fun withPrivacyMeta(html: String, blockRemote: Boolean): String =
+    inHead(html, NO_DNS_PREFETCH + if (blockRemote) BLOCK_ALL_POLICY else "")
+
+private const val NO_DNS_PREFETCH = "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\">"
+private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
+    "img-src data:; font-src data:; style-src 'unsafe-inline'; form-action 'none'\">"
+
+/** [meta] placed right after the opening head tag, or before everything when there is none. */
+private fun inHead(html: String, meta: String): String {
     // Plain scans, no regex: this runs on the main thread, and a `<head[^>]*>` regex is quadratic
     // on a body of `<head` with no `>` after it (an ANR a sender could trigger).
     var i = html.indexOf("<head", ignoreCase = true)
@@ -478,5 +494,5 @@ internal fun withViewport(html: String): String {
         i = html.indexOf("<head", i + 5, ignoreCase = true)
     }
     val end = if (i < 0) -1 else html.indexOf('>', i)
-    return if (end >= 0) html.replaceRange(end + 1, end + 1, VIEWPORT) else VIEWPORT + html
+    return if (end >= 0) html.replaceRange(end + 1, end + 1, meta) else meta + html
 }

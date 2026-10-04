@@ -30,6 +30,14 @@ class ViewportTest {
     }
 
     @Test
+    fun privacyMeta_comesFirst_withThePolicyOnlyWhileBlocked() {
+        val blocked = withPrivacyMeta("<head><link rel=dns-prefetch href=//x.evil></head>", blockRemote = true)
+        assertTrue(blocked.startsWith("<head><meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta http-equiv=\"Content-Security-Policy\""))
+        val open = withPrivacyMeta("<p>x</p>", blockRemote = false)
+        assertEquals("<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><p>x</p>", open)
+    }
+
+    @Test
     fun mailto_keepsRecipientsSubjectAndBodyOnly() {
         assertEquals(
             "mailto:a@b.c?subject=Hi&body=x%20y",
