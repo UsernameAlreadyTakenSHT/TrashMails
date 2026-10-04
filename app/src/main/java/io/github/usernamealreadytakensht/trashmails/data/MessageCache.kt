@@ -19,7 +19,7 @@ import java.io.File
 class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {}) {
     constructor(context: Context) : this(FileStore(File(context.noBackupFilesDir, "messages")), context)
 
-    private constructor(store: FileStore, context: Context) : this(store, migrate = { migrateFrom(context, store) })
+    private constructor(store: FileStore, context: Context) : this(store, migrate = { prepare(context, store) })
 
     private val lock = Any()
     private var migrated = false
@@ -140,6 +140,14 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
     )
 
     private companion object {
+        /** Run once before the first access to the files of this run. */
+        fun prepare(context: Context, store: FileStore) {
+            migrateFrom(context, store)
+            // An address never opened again never had its expired mail dropped: a file last written
+            // more than a week ago only holds mail kept longer than that, and goes whole.
+            runCatching { store.deleteWrittenBefore(System.currentTimeMillis() - MAX_AGE_MS) }
+        }
+
         /**
          * Up to 0.5.3 every address shared one SharedPreferences file, loaded whole: its entries
          * move to their own files, then it goes. If it cannot even be loaded (the out-of-memory it

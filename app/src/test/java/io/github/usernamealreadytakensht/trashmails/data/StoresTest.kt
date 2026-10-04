@@ -254,6 +254,15 @@ class FileStoreTest {
     private val store = FileStore(dir)
 
     @Test
+    fun filesWrittenBeforeACutoff_go() {
+        store.put("old" to "x", "new" to "y")
+        dir.listFiles()!!.first { it.readText() == "x" }.setLastModified(1_000L)
+        store.deleteWrittenBefore(2_000L)
+        assertNull(store.getString("old"))
+        assertEquals("y", store.getString("new"))
+    }
+
+    @Test
     fun oneFilePerKey_removedWithIt() {
         store.put("tempmail_lol:a@b" to "x", "dropmail:c@d" to "y")
         assertEquals("x", store.getString("tempmail_lol:a@b"))

@@ -45,4 +45,9 @@ class FileStore(private val dir: File) : Prefs {
     }
 
     private fun tmpFor(target: File) = File(dir, target.name + ".tmp")
+
+    /** Deletes every file last written before [cutoffMillis], whatever its key (temporary ones included). */
+    fun deleteWrittenBefore(cutoffMillis: Long) {
+        dir.listFiles()?.forEach { if (it.isFile && it.lastModified() < cutoffMillis) it.delete() }
+    }
 }
