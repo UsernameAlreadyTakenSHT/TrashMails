@@ -41,17 +41,16 @@ object Http : HttpApi {
         .followSslRedirects(false)
         .build()
 
-    override suspend fun get(url: String, headers: Map<String, String>): String =
-        execute(Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build())
+    override suspend fun get(url: String, headers: Map<String, String>): String = execute(request(url, headers).build())
 
     override suspend fun postJson(url: String, body: String, headers: Map<String, String>): String =
-        execute(
-            Request.Builder().url(url).post(body.toRequestBody(json))
-                .apply { headers.forEach { (k, v) -> header(k, v) } }.build()
-        )
+        execute(request(url, headers).post(body.toRequestBody(json)).build())
 
     override suspend fun delete(url: String, headers: Map<String, String>): String =
-        execute(Request.Builder().url(url).delete().apply { headers.forEach { (k, v) -> header(k, v) } }.build())
+        execute(request(url, headers).delete().build())
+
+    private fun request(url: String, headers: Map<String, String>) =
+        Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }
 
     /**
      * Runs the call on OkHttp's own threads and cancels it when the coroutine is cancelled, so
