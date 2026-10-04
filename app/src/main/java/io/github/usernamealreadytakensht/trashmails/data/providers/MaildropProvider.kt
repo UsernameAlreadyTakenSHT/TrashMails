@@ -31,7 +31,8 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
         val body = JSONObject().put("query", query).put("variables", JSONObject(variables)).toString()
         val json = JSONObject(http.postJson(ENDPOINT, body))
         json.optJSONArray("errors")?.takeIf { it.length() > 0 }?.let {
-            throw ProviderException(it.getJSONObject(0).optString("message", "Maildrop error"))
+            // Prefixed: server text must not pass for a message of the app itself.
+            throw ProviderException("Maildrop: " + it.getJSONObject(0).optString("message", "error"))
         }
         return json.getJSONObject("data")
     }

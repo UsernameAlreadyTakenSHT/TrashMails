@@ -29,7 +29,8 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
     private fun unwrap(body: String): JSONObject {
         val json = JSONObject(body)
         if (!json.optBoolean("success")) {
-            val msg = json.optJSONObject("errors")?.optString("msg") ?: "Burner Kiwi error"
+            // Prefixed: server text must not pass for a message of the app itself.
+            val msg = "Burner Kiwi: " + (json.optJSONObject("errors")?.optString("msg") ?: "error")
             throw ProviderException(msg)
         }
         return json

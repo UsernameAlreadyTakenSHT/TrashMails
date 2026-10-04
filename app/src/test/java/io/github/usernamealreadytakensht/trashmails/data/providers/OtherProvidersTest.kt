@@ -69,7 +69,7 @@ class MaildropProviderTest {
     fun graphqlErrorsBecomeProviderErrors() = runBlocking {
         val provider = MaildropProvider(FakeHttp().on("/graphql", fixture("maildrop_error")))
         val e = assertThrows(ProviderException::class.java) { runBlocking { provider.listMessages(inbox) } }
-        assertEquals("Mailbox name is not valid", e.message)
+        assertEquals("Maildrop: Mailbox name is not valid", e.message)
     }
 
     @Test
@@ -113,6 +113,6 @@ class BurnerKiwiProviderTest {
     fun apiErrorsBecomeProviderErrors() = runBlocking {
         val provider = BurnerKiwiProvider(FakeHttp().on("/api/v2/inbox", fixture("burner_error")))
         val e = assertThrows(ProviderException::class.java) { runBlocking { provider.createInbox(null) } }
-        assertEquals("Forbidden: invalid token", e.message)
+        assertEquals("Burner Kiwi: Forbidden: invalid token", e.message)
     }
 }
