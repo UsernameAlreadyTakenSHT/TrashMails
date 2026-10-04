@@ -183,6 +183,11 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         // A reply nested deeply enough to exhaust the parser (org.json is recursive): a failure, not a crash.
         onError(fallback)
         null
+    } catch (e: OutOfMemoryError) {
+        // One oversized reply or message (several 8 MiB replies at once): what it allocated is
+        // garbage once this frame is gone, so the app carries on with an error instead of dying.
+        onError("Not enough memory for this reply")
+        null
     }
 
     /** The app is visible again: resume polling the open inbox (not while a message is read), waiting out the rest of the interval. */
