@@ -23,5 +23,5 @@ SOFTWARE.
 ---
 
 Excluded from this license: the provider logos in app/src/main/res/drawable-nodpi/
-(logo_*.png). They are the artwork and trademarks of their respective services,
+(logo_*.webp). They are the artwork and trademarks of their respective services,
 used only to identify them, and remain the property of their owners.
