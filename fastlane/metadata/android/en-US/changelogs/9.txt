@@ -1,0 +1,8 @@
+Security review, five angles:
+- A crafted email can no longer freeze the app or crash it at launch
+- Oversized links and subjects no longer crash the app
+- Kept emails go after a week; no snapshot in recent apps (Android 13+)
+- Generic user agent and nothing left on disk by the HTML view
+- Sensitive copies flagged on Android 10-12; public addresses copied as sensitive
+- DropMail.me token kept on firewall errors
+- Every build dependency checked against its SHA-256

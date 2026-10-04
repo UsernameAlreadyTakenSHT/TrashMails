@@ -1,3 +1,31 @@
+## v0.5.4 — 2026-10-04
+
+A five-angle security review of 0.5.3 (sender-controlled content, hostile servers, data on the device, platform and build, resilience) and the fixes for everything it found.
+
+### Fixed
+- **A crafted email could still freeze the app.** The 0.5.3 fix for HTML conversion was incomplete: a body of `<` (or `<li `, `<p `) with no `>` after them still took minutes to hours of CPU. Shown as HTML, a body of `<head` froze the main thread until the system killed the app. A Maildrop header folded over many lines froze a thread too. All three are linear now.
+- **The local email cache could crash the app at every launch.** tempmail.lol and DropMail.me emails shared one file, loaded whole: filling two addresses could run it out of memory, after which listing, removing the address and (with "forget old addresses") every launch crashed. Each address now has its own file, bounded to 2 M characters, and a file that cannot be read is an empty cache. The 0.5.3 file is moved over once.
+- **Out of memory on one reply or message is an error, not a crash**, and a Maildrop message is parsed within 1 MiB and five levels of nesting.
+- **Oversized senders, subjects and links no longer crash the app** when it goes to the background or opens or copies them (binder limit): headers are cut at 1000 characters, links over 8 KiB are refused, and opening or copying reports a failure.
+- **A provider listing an id twice no longer crashes the inbox screen**, nor a duplicate stored address the home screen.
+- **The link dialog never shows a look-alike host alone**: punycode failed on recent Unicode characters (an invisible one will do) and the bare host was shown.
+- **DropMail.me**: a firewall 403 no longer throws the device token away (which stranded every session), and removing an address while its session was being restored no longer leaves its restore key behind.
+- **tempmail.lol message ids use SHA-256**: a sender could forge a message with the same 32-bit hash, which replaced the real one.
+- **Refresh is throttled from the last attempt**, not the last success, and on return to the foreground too.
+- Server ids in URL paths refuse `.` and `..`; server times are checked before conversion (a huge one made "forget old addresses" drop the address at once); addresses handed out by a server must be plain ASCII.
+- A sender can no longer forge the "text <address>" a real link gets in plain text; at most 500 links are made tappable in a plain body.
+
+### Changed
+- **Kept emails go a week after the app kept them** (tempmail.lol, DropMail.me), instead of staying as long as the address.
+- **No snapshot of the app in the recent-apps screen** (Android 13+), whatever the screenshot setting; deliberate screenshots still work.
+- **The HTML view sends a generic user agent** (no device model) and what Chromium writes to disk is cleared.
+- **Copies flagged sensitive on Android 10–12 too**, and the address of a public inbox (Inbox Kitten, Maildrop, Guerrilla Mail) is copied as sensitive.
+- **The name field no longer lets the keyboard learn the name** (no auto-correction).
+- **The DropMail.me device token goes with the last DropMail.me address.**
+- **Server error lines are always attributed** to their service, without bidi or zero-width characters; senders, subjects and recipients lose bidi controls.
+- **Inbox Kitten**: the retention dialog says that a hyphenated name can be found by any of its words.
+- **Build**: official Gradle wrapper jar, every dependency checked against its SHA-256 (`gradle/verification-metadata.xml`), AndroidX and Android tools resolved from Google's repository only, no task affinity (task hijacking on Android 10), any keystore git-ignored, no coroutines debug file in the APK.
+
 ## v0.5.3 — 2026-09-28
 
 A security, reliability and packaging review ahead of the F-Droid submission, and the fixes for what it found.
