@@ -120,7 +120,10 @@ private val BIDI_CONTROLS = Regex("[\u200E\u200F\u202A-\u202E\u2066-\u2069]")
 /** Without bidirectional controls: what is shown reads in the order it is stored, links included. */
 fun String.withoutBidiControls(): String = replace(BIDI_CONTROLS, "")
 
-private fun String.forHeader() = take(MAX_HEADER_CHARS).withoutBidiControls()
+/** Line breaks and other control characters: a header is one line, they could fake more of them. */
+private val HEADER_BREAKS = Regex("[\\p{Cc}\u2028\u2029]+")
+
+private fun String.forHeader() = take(MAX_HEADER_CHARS).withoutBidiControls().replace(HEADER_BREAKS, " ")
 
 /**
  * The sender-controlled lines of a summary made safe to show and keep: bounded (they travel in

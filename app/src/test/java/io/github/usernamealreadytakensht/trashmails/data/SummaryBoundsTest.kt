@@ -16,6 +16,13 @@ class SummaryBoundsTest {
     }
 
     @Test
+    fun headersAreOneLine() {
+        val s = MailSummary(id = "1", from = "service@paypal.com\n\n <x@evil>", subject = "a\r\nb", date = 1).bounded()
+        assertEquals("service@paypal.com <x@evil>", s.from)
+        assertEquals("a b", s.subject)
+    }
+
+    @Test
     fun aBodyLosesItsBidiControls_soALinkReadsAsWhatItIs() {
         val body = "Click ‮⁦https://evil.example/⁩⁦https://bank.com/login?next=⁩‬ now"
         assertEquals("Click https://evil.example/https://bank.com/login?next= now", body.withoutBidiControls())
