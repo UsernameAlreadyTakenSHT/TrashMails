@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -72,6 +73,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextAlign
@@ -318,6 +321,13 @@ private fun CreateInboxDialog(
                     enabled = provider.allowsCustomName && !creating,
                     singleLine = true,
                     label = { Text("Name") },
+                    // No auto-correction or capitals: the keyboard would learn (and suggest elsewhere)
+                    // a name that, for a public inbox, opens it.
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                    ),
                     suffix = { if (provider.domains.isEmpty()) Text(provider.fieldSuffix) },
                     // A suffix only shows once the field is focused or filled: the domain choice must stay in sight.
                     trailingIcon = if (provider.domains.isEmpty()) null else {
