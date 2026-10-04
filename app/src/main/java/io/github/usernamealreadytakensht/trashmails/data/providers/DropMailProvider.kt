@@ -292,7 +292,8 @@ class DropMailProvider(
     private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) {
         // Checked and written as one step under the cache lock, so it cannot land just after the removal.
         cache.unlessForgotten(inbox.key) {
-            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", box.seal(restoreKey, restoreContext(inbox))).toString())
+            // On disk before going on: the server has already rotated the previous key.
+            prefs.putNow(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", box.seal(restoreKey, restoreContext(inbox))).toString())
         }
     }
 

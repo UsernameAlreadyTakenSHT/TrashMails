@@ -9,6 +9,11 @@ interface Prefs {
     fun getBoolean(key: String, default: Boolean): Boolean
     /** Writes every entry (String, Int or Boolean values) in one edit. */
     fun put(vararg entries: Pair<String, Any>)
+    /**
+     * As [put], but on disk before it returns: for a value the server has already replaced on its
+     * side, which a process killed before an asynchronous write would leave stale for good.
+     */
+    fun putNow(vararg entries: Pair<String, Any>) = put(*entries)
     /** Drops the entries, so a forgotten inbox leaves no key behind. */
     fun remove(vararg keys: String)
 }
@@ -21,7 +26,13 @@ class SharedPrefs(context: Context, name: String) : Prefs {
     override fun getInt(key: String, default: Int): Int = prefs.getInt(key, default)
     override fun getBoolean(key: String, default: Boolean): Boolean = prefs.getBoolean(key, default)
 
-    override fun put(vararg entries: Pair<String, Any>) {
+    override fun put(vararg entries: Pair<String, Any>) = edit(entries).apply()
+
+    override fun putNow(vararg entries: Pair<String, Any>) {
+        edit(entries).commit()
+    }
+
+    private fun edit(entries: Array<out Pair<String, Any>>): android.content.SharedPreferences.Editor {
         val edit = prefs.edit()
         for ((key, value) in entries) {
             when (value) {
@@ -31,7 +42,7 @@ class SharedPrefs(context: Context, name: String) : Prefs {
                 else -> throw IllegalArgumentException("Unsupported preference type for $key")
             }
         }
-        edit.apply()
+        return edit
     }
 
     override fun remove(vararg keys: String) {
