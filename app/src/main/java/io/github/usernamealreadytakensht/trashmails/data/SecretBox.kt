@@ -88,3 +88,21 @@ object KeystoreBox : SecretBox {
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val IV_BYTES = 12
 }
+
+/**
+ * [Prefs] whose values are sealed by [box] before they reach [inner], each for "[purpose]:key". A
+ * value that cannot be opened reads as missing; one stored before sealing reads as it is, and is
+ * sealed at its next write.
+ */
+class SealedPrefs(private val inner: Prefs, private val box: SecretBox, private val purpose: String) : Prefs {
+    private fun context(key: String) = "$purpose:$key"
+    private fun sealed(entries: Array<out Pair<String, Any>>) =
+        entries.map { (key, value) -> key to box.seal(value.toString(), context(key)) }.toTypedArray()
+
+    override fun getString(key: String): String? = inner.getString(key)?.let { box.open(it, context(key)) }
+    override fun getInt(key: String, default: Int): Int = getString(key)?.toIntOrNull() ?: default
+    override fun getBoolean(key: String, default: Boolean): Boolean = getString(key)?.toBooleanStrictOrNull() ?: default
+    override fun put(vararg entries: Pair<String, Any>) = inner.put(*sealed(entries))
+    override fun putNow(vararg entries: Pair<String, Any>) = inner.putNow(*sealed(entries))
+    override fun remove(vararg keys: String) = inner.remove(*keys)
+}

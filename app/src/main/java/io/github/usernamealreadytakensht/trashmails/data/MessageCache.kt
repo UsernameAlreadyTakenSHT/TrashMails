@@ -19,7 +19,9 @@ import java.io.File
 class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {}) {
     constructor(context: Context) : this(FileStore(File(context.noBackupFilesDir, "messages")), context)
 
-    private constructor(store: FileStore, context: Context) : this(store, migrate = { prepare(context, store) })
+    // The files hold the emails themselves (codes, sign-in links): sealed like the other secrets.
+    private constructor(store: FileStore, context: Context) :
+        this(SealedPrefs(store, KeystoreBox, "messages"), migrate = { prepare(context, store) })
 
     private val lock = Any()
     private var migrated = false

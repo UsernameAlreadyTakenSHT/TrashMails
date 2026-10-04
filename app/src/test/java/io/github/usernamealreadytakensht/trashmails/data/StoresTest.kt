@@ -254,6 +254,25 @@ class FileStoreTest {
     private val store = FileStore(dir)
 
     @Test
+    fun sealedPrefs_sealEachValueForItsKey() {
+        val box = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$context|${plain.reversed()}"
+            override fun open(stored: String, context: String) =
+                if (!stored.startsWith("k2:")) stored
+                else stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v.reversed() else null }
+        }
+        val inner = MemoryPrefs()
+        val sealed = SealedPrefs(inner, box, "messages")
+        sealed.put("a" to "mail body")
+        assertEquals("k2:messages:a|ydob liam", inner.getString("a"))
+        assertEquals("mail body", sealed.getString("a"))
+        inner.put("b" to inner.getString("a")!!)
+        assertNull(sealed.getString("b"))
+        inner.put("c" to "[stored in clear before]")
+        assertEquals("[stored in clear before]", sealed.getString("c"))
+    }
+
+    @Test
     fun filesWrittenBeforeACutoff_go() {
         store.put("old" to "x", "new" to "y")
         dir.listFiles()!!.first { it.readText() == "x" }.setLastModified(1_000L)
