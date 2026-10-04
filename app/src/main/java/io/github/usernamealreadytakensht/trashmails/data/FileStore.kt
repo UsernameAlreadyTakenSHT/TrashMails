@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data
 
 import java.io.File
+import java.io.FileOutputStream
 import java.security.MessageDigest
 
 /**
@@ -23,8 +24,14 @@ class FileStore(private val dir: File) : Prefs {
         dir.mkdirs()
         for ((key, value) in entries) {
             val target = fileFor(key)
-            val tmp = File(dir, target.name + ".tmp")
-            tmp.writeText(value.toString())
+            val tmp = tmpFor(target)
+            // Synced before the rename: a power loss right after must find the old file or the new
+            // one, not an empty one.
+            FileOutputStream(tmp).use { out ->
+                out.write(value.toString().toByteArray())
+                out.fd.sync()
+            }
+            // Atomic over the old file on Android (Linux); the delete only serves the JVM tests on Windows.
             if (!tmp.renameTo(target)) {
                 target.delete()
                 tmp.renameTo(target)
@@ -32,7 +39,10 @@ class FileStore(private val dir: File) : Prefs {
         }
     }
 
+    /** Deletes the file, and the temporary one a write cut short may have left with the same data. */
     override fun remove(vararg keys: String) {
-        keys.forEach { fileFor(it).delete() }
+        keys.forEach { key -> fileFor(key).let { it.delete(); tmpFor(it).delete() } }
     }
+
+    private fun tmpFor(target: File) = File(dir, target.name + ".tmp")
 }
