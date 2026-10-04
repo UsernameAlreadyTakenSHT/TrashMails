@@ -31,6 +31,8 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
 
     private companion object {
         const val BASE = "https://api.mail.tm"
+        /** Pages of 30 read per refresh: 150 messages, far more than a disposable inbox gets. */
+        const val MAX_PAGES = 5
     }
 
 
@@ -98,11 +100,22 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
         )
     }
 
+    /**
+     * Every message, page by page: the API hands out 30 at a time and only the first page was read,
+     * so mail beyond the 30th never showed. At most [MAX_PAGES] pages per refresh.
+     */
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
-        val json = authed(inbox) { h -> JSONObject(http.get("$BASE/messages", h)) }
-        val arr = json.optJSONArray("hydra:member") ?: return emptyList()
-        return (0 until arr.length()).map { i ->
-            val m = arr.getJSONObject(i)
+        val members = mutableListOf<JSONObject>()
+        var page = 1
+        while (true) {
+            val json = authed(inbox) { h -> JSONObject(http.get("$BASE/messages?page=$page", h)) }
+            val arr = json.optJSONArray("hydra:member") ?: break
+            (0 until arr.length()).forEach { members += arr.getJSONObject(it) }
+            val total = json.optInt("hydra:totalItems", members.size)
+            if (arr.length() == 0 || members.size >= total || page >= MAX_PAGES) break
+            page++
+        }
+        return members.map { m ->
             val from = m.optJSONObject("from")
             MailSummary(
                 id = m.getString("id"),

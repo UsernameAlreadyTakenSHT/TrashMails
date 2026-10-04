@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.body
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.httpError
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.fixture
 import kotlinx.coroutines.runBlocking
@@ -50,6 +51,25 @@ class MailTmProviderTest {
     }
 
     @Test
+    fun listMessages_readsEveryPage_upToFive() = runBlocking {
+        fun page(n: Int, size: Int) = body(
+            """{"hydra:totalItems":1000,"hydra:member":[""" +
+                (1..size).joinToString(",") { """{"id":"m$n-$it","subject":"s","createdAt":"2026-01-01T00:00:00+00:00"}""" } + "]}"
+        )
+        val http = FakeHttp()
+            .on("/token", fixture("mailtm_token"))
+            .on("page=1", page(1, 30)).on("page=2", page(2, 30)).on("page=3", page(3, 30))
+            .on("page=4", page(4, 30)).on("page=5", page(5, 30)).on("page=6", page(6, 30))
+        assertEquals(150, MailTmProvider(http).listMessages(inbox).size)
+        assertTrue(http.urls().none { it.endsWith("page=6") })
+
+        val short = FakeHttp().on("/token", fixture("mailtm_token"))
+            .on("page=1", body("""{"hydra:totalItems":31,"hydra:member":[""" + (1..30).joinToString(",") { """{"id":"a$it"}""" } + "]}"))
+            .on("page=2", body("""{"hydra:totalItems":31,"hydra:member":[{"id":"b1"}]}"""))
+        assertEquals(31, MailTmProvider(short).listMessages(inbox).size)
+    }
+
+    @Test
     fun listMessages_fetchesTheTokenOnce_andSortsNewestFirst() = runBlocking {
         val http = http()
         val provider = MailTmProvider(http)
@@ -62,7 +82,7 @@ class MailTmProviderTest {
         // No address on the sender: the display name is used instead.
         assertEquals("Bob", list[1].from)
         assertEquals(1, http.urls("POST").count { it.endsWith("/token") })
-        val listing = http.calls.filter { it.url.endsWith("/messages") }
+        val listing = http.calls.filter { it.url.endsWith("/messages?page=1") }
         assertEquals(2, listing.size)
         assertTrue(listing.all { it.headers["Authorization"]!!.startsWith("Bearer eyJ") })
     }
@@ -76,7 +96,7 @@ class MailTmProviderTest {
         val list = MailTmProvider(http).listMessages(inbox)
 
         assertTrue(list.isEmpty())
-        assertEquals(listOf("/token", "/messages", "/token", "/messages"), http.urls().map { it.substringAfter("api.mail.tm") })
+        assertEquals(listOf("/token", "/messages?page=1", "/token", "/messages?page=1"), http.urls().map { it.substringAfter("api.mail.tm") })
     }
 
     @Test
