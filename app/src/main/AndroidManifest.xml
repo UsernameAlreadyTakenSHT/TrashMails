@@ -12,6 +12,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:taskAffinity=""
         android:theme="@style/Theme.TrashMails">
         <!-- The mail WebView reports no usage metrics to Google, and checks no URL with Safe Browsing
              (which would send the addresses of loaded images to Google). -->
