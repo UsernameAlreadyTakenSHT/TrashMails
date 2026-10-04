@@ -87,8 +87,8 @@ fun SettingsScreen(
             )
             HorizontalDivider()
             SettingRow(
-                title = "Load remote images",
-                description = "Off: images, styles and fonts hosted on the sender's servers are not fetched " +
+                title = "Load remote content",
+                description = "Off: images, styles, fonts, frames and media hosted on the sender's servers are not fetched " +
                     "when an email is rendered as HTML, so the sender cannot tell it was opened. " +
                     "They can be loaded for a single message from its menu.",
                 checked = settings.loadImages,

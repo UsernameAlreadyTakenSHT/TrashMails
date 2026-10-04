@@ -137,7 +137,7 @@ fun MessageScreen(
                             onClick = { showHtml = !showHtml; menuOpen = false },
                         )
                         if (hasHtml && showHtml && !loadImages) DropdownMenuItem(
-                            text = { Text("Load remote images") },
+                            text = { Text("Load remote content") },
                             onClick = { loadImages = true; menuOpen = false },
                         )
                     }
@@ -175,7 +175,7 @@ fun MessageScreen(
                     }
                 }
                 showHtml && content.html != null -> {
-                    if (!loadImages) BodyBanner("Remote images not loaded", "Load") { loadImages = true }
+                    if (!loadImages) BodyBanner("Remote content (images, styles…) not loaded", "Load") { loadImages = true }
                     HtmlBody(content.html, loadImages, onLink)
                 }
                 !text.isNullOrBlank() -> {

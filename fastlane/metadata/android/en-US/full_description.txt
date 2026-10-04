@@ -14,7 +14,7 @@
 <p><b>Privacy</b></p>
 <ul>
 <li>No backend, no account, no tracking: the app only talks to the providers' public APIs.</li>
-<li>Emails are shown as plain text by default. HTML rendering has JavaScript disabled and remote images blocked unless you ask, so opening a message tells the sender nothing.</li>
+<li>Emails are shown as plain text by default. HTML rendering has JavaScript disabled and remote content (images, styles, fonts) blocked unless you ask, so opening a message tells the sender nothing.</li>
 <li>Links are confirmed before leaving the app, with the site and full address shown; only http(s) and mailto links open.</li>
 <li>Tokens, passwords and kept emails stay in the app's private storage, excluded from backups. Removing an address drops all of it.</li>
 <li>Optional: block screenshots, forget old addresses automatically.</li>
