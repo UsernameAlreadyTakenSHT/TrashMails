@@ -11,6 +11,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
 import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
 import java.net.URLEncoder
@@ -51,7 +52,7 @@ class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
                     ev.optJSONObject("envelope")?.textOrEmpty("sender").orEmpty()
                 },
                 subject = headers?.textOrEmpty("subject").orEmpty(),
-                date = (ev.optDouble("timestamp", 0.0) * 1000).toLong(),
+                date = ev.optDouble("timestamp", 0.0).let { s -> if (secondsToMillis(s.toLong()) != null) (s * 1000).toLong() else 0L },
                 ref = mapOf("key" to key, "region" to storage.optString("region")),
             )
         }

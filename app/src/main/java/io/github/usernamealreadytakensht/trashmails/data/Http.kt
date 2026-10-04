@@ -113,6 +113,14 @@ fun pathSegment(id: String): String {
     return URLEncoder.encode(id, "UTF-8").replace("+", "%20")
 }
 
+/**
+ * A server time in seconds as milliseconds, or null when it is none or not plausible (beyond ten
+ * years from now): multiplied blindly, a huge value overflowed to a negative date, which made
+ * "forget old addresses" drop the address at once.
+ */
+fun secondsToMillis(seconds: Long): Long? =
+    seconds.takeIf { it > 0 && it < System.currentTimeMillis() / 1000 + 10 * 365 * 24 * 3600L }?.times(1000)
+
 private val ADDRESS = Regex("""[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}){1,8}""")
 
 /**

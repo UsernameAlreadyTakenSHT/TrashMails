@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.pathSegment
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
@@ -46,8 +47,8 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
             provider = provider,
             address = checkedAddress(email.getString("address"), provider),
             token = result.getString("token"),
-            createdAt = email.optLong("created_at") * 1000,
-            expiresAt = email.optLong("ttl").takeIf { it > 0 }?.let { it * 1000 },
+            createdAt = secondsToMillis(email.optLong("created_at")) ?: System.currentTimeMillis(),
+            expiresAt = secondsToMillis(email.optLong("ttl")),
         )
     }
 
@@ -63,7 +64,7 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
                 id = m.getString("id"),
                 from = m.textOrEmpty("from").ifBlank { m.textOrEmpty("sender") },
                 subject = m.textOrEmpty("subject"),
-                date = m.optLong("received_at") * 1000,
+                date = secondsToMillis(m.optLong("received_at")) ?: 0L,
                 html = m.text("body_html"),
                 text = m.text("body_plain"),
             )

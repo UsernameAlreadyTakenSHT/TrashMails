@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -94,7 +95,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             address = checkedAddress("$local@$domain", provider),
             // The session token is cached in memory only: it expires within the hour and is not a secret worth keeping.
             token = null,
-            createdAt = json.optLong("email_timestamp").takeIf { it > 0 }?.let { it * 1000 }
+            createdAt = secondsToMillis(json.optLong("email_timestamp"))
                 ?: System.currentTimeMillis(),
         )
     }
@@ -120,7 +121,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
                 from = m.textOrEmpty("mail_from"),
                 subject = m.textOrEmpty("mail_subject"),
                 // The welcome mail has no timestamp: date it at the inbox creation, not "now" on every poll.
-                date = m.optLong("mail_timestamp").takeIf { it > 0 }?.let { it * 1000 } ?: inbox.createdAt,
+                date = secondsToMillis(m.optLong("mail_timestamp")) ?: inbox.createdAt,
             )
         }.sortedByDescending { it.date }
     }
