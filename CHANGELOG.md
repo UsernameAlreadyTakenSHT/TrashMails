@@ -1,3 +1,19 @@
+## v0.5.6 — 2026-10-04
+
+Lighter refreshes, a few interface fixes, and continuous integration.
+
+### Fixed
+- **mail.tm lists every message**, not only the first 30: pages are read up to the total, at most five (150 messages) per refresh.
+- **Errors and notices survive a rotation or a theme change** instead of vanishing unread.
+- **"expires in…" and "next slot in…" count down** while on screen instead of staying frozen, and a creation slot coming free while the create dialog is open makes Create available again.
+
+### Changed
+- **DropMail.me refreshes ask for the message ids only**; the bodies are downloaded once a new mail shows up, not at every refresh.
+- **A message just read reopens at once**: the last ten bodies opened are kept in memory.
+- **Provider logos are 192 px lossless WebP** (138 KB down to 75 KB).
+- **AGP 9.4.1.**
+- **Continuous integration**: every push is checked on Linux (official Gradle wrapper, tests, lint, release build with dependency verification); `gradlew` is now executable there.
+
 ## v0.5.5 — 2026-10-04
 
 The rest of the 0.5.3 security review: the points it rated informational.

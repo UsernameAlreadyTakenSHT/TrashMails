@@ -1,0 +1,6 @@
+- mail.tm lists every message, not only the first 30
+- Errors and notices survive a rotation or a theme change
+- Expiry and quota countdowns update while on screen
+- DropMail.me refreshes download message bodies only when new mail arrives
+- A message just read reopens at once
+- Smaller provider logos
