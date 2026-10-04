@@ -83,6 +83,8 @@ class DropMailProviderTest {
         val cache = MessageCache(MemoryPrefs())
         val prefs = MemoryPrefs()
         val http = http().onBody("introduceSession(input: {permanentDomainOnly", body(session))
+            // The bodies, asked for once a mail the app does not hold shows in the ids-only listing.
+            .onBody("mails { id receivedAt", fixture("dropmail_session"))
             .onBody("session(id:", fixture("dropmail_session"), body(notFound), body("""{"data":{"session":{"id":"U2Vzc2lvbjpuZXc","mails":[]}}}"""))
             .onBody("introduceSession(input: {withAddress: false", body(emptySession))
             .onBody("restoreAddress", body(restored))
@@ -188,6 +190,20 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun bodiesAreFetchedOnlyWhenAMailIsNew() = runBlocking {
+        val prefs = MemoryPrefs()
+        prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")
+        val http = http().onBody("session(id:", fixture("dropmail_session"))
+        val p = provider(http, prefs, MessageCache(MemoryPrefs()))
+        p.listMessages(inbox)
+        p.listMessages(inbox)
+        p.listMessages(inbox)
+        val queries = http.calls.mapNotNull { it.body }.filter { "session(id:" in it }
+        assertEquals(4, queries.size)
+        assertEquals(1, queries.count { "text html" in it })
+    }
+
+    @Test
     fun deleteMessage_dropsTheLocalCopy_andKeepsItOutOfLaterListings() = runBlocking {
         val cache = MessageCache(MemoryPrefs())
         val prefs = MemoryPrefs()
@@ -221,7 +237,8 @@ class DropMailCacheRaceTest {
         lateinit var provider: DropMailProvider
         lateinit var victim: MailSummary
         // The server still lists the message the user deletes while the second listing is in flight.
-        val http = FakeHttp().on("/api/token/generate", body("""{"token":"af_testtokenx"}""")).onBody(
+        val http = FakeHttp().on("/api/token/generate", body("""{"token":"af_testtokenx"}"""))
+            .onBody("mails { id receivedAt", fixture("dropmail_session")).onBody(
             "session(id:",
             fixture("dropmail_session"),
             { runBlocking { provider.deleteMessage(inbox, victim) }; fixture("dropmail_session")() },

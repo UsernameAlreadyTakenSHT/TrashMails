@@ -87,7 +87,9 @@ class DropMailProvider(
 
     override suspend fun listMessages(inbox: Inbox): List<MailSummary> {
         val (sessionId, restoreKey) = loadSession(inbox)
-        val json = sessionId?.let { graphql("{ session(id: ${quote(it)}) { id mails { $MAIL_FIELDS } } }") }
+        // The ids only first: the bodies (up to 100 mails of them) are fetched again only when a
+        // mail the app does not hold yet has arrived, not at every refresh.
+        val json = sessionId?.let { graphql("{ session(id: ${quote(it)}) { id mails { id } } }") }
         val session = json?.data("session")
         if (session == null) {
             // Lapsed (or never listed since a restore failed): back into a fresh session, which
@@ -96,7 +98,12 @@ class DropMailProvider(
             restore(inbox, restoreKey)
             return cache.load(inbox.key)
         }
-        val arr = session.optJSONArray("mails") ?: fail(json, "DropMail.me could not list the inbox")
+        val ids = session.optJSONArray("mails") ?: fail(json, "DropMail.me could not list the inbox")
+        val held = cache.load(inbox.key).map { it.id }.toSet() + tombstones(inbox)
+        val unseen = (0 until ids.length()).mapNotNull { ids.optJSONObject(it)?.text("id") }.filterNot { it in held }
+        if (unseen.isEmpty()) return cache.load(inbox.key)
+        val full = graphql("{ session(id: ${quote(sessionId)}) { id mails { $MAIL_FIELDS } } }")
+        val arr = full.data("session")?.optJSONArray("mails") ?: fail(full, "DropMail.me could not list the inbox")
         val fresh = (0 until arr.length()).mapNotNull { i ->
             val m = arr.optJSONObject(i) ?: return@mapNotNull null
             val id = m.text("id") ?: return@mapNotNull null
