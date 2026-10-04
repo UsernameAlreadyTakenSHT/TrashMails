@@ -239,7 +239,10 @@ class DropMailProvider(
 
     /** The device's `af_` token, requested when there is none or it is about to run out. */
     private suspend fun token(): String {
-        val stored = prefs.getString(KEY_TOKEN)?.takeIf { it.isNotBlank() }?.let(box::open)
+        val raw = prefs.getString(KEY_TOKEN)?.takeIf { it.isNotBlank() }
+        val stored = raw?.let(box::open)
+        // A token stored in clear by 0.5.4 and earlier is sealed the first time it is read.
+        if (stored != null && raw == stored && box !== PlainBox) prefs.put(KEY_TOKEN to box.seal(stored))
         val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: 0L
         if (!stored.isNullOrBlank() && expiresAt - System.currentTimeMillis() > TOKEN_MARGIN_MS) return stored
         val json = try {
@@ -264,9 +267,13 @@ class DropMailProvider(
     /** The current session id (null when none was ever stored) and restore key of [inbox]. */
     private fun loadSession(inbox: Inbox): Pair<String?, String> {
         val o = prefs.getString(sessionKey(inbox))?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val restoreKey = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }?.let(box::open) ?: inbox.token
+        val raw = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }
+        val restoreKey = raw?.let(box::open) ?: inbox.token
             ?: throw ProviderException("Missing restore key")
-        return o?.optString("session")?.takeIf { it.isNotBlank() } to restoreKey
+        val sessionId = o?.optString("session")?.takeIf { it.isNotBlank() }
+        // A restore key stored in clear by 0.5.4 and earlier is sealed the first time it is read.
+        if (sessionId != null && raw == restoreKey && box !== PlainBox) saveSession(inbox, sessionId, restoreKey)
+        return sessionId to restoreKey
     }
 
     /** Not for an address removed while its restoration was in flight: removing it drops all of it. */
