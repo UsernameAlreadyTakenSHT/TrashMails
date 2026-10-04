@@ -102,5 +102,15 @@ fun sanitizeName(raw: String?): String? =
         ?.trim('.')
         ?.takeIf { it.isNotBlank() }
 
+private val ADDRESS = Regex("""[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}){1,8}""")
+
+/**
+ * [address] as handed out by [provider]'s server, which the app shows, copies and stores: refused
+ * unless it is a plain ASCII address (a server could otherwise send one with a line break, bidi
+ * controls that make it read as another, or megabytes of it).
+ */
+fun checkedAddress(address: String, provider: Provider): String =
+    address.takeIf { ADDRESS.matches(it) } ?: throw ProviderException("${provider.label} sent an address the app cannot use")
+
 /** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401), [body] explain. */
 class HttpException(val code: Int, host: String, val body: String = "") : ProviderException("$host answered HTTP $code")

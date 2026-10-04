@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
+import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
@@ -72,7 +73,7 @@ class DropMailProvider(
         val session = json.data("introduceSession") ?: fail(json, "DropMail.me could not create the address")
         val first = session.optJSONArray("addresses")?.optJSONObject(0)
             ?: throw ProviderException("DropMail.me created a session without an address")
-        val address = first.getString("address")
+        val address = checkedAddress(first.getString("address"), provider)
         val restoreKey = first.getString("restoreKey")
         val inbox = Inbox(id = address, provider = provider, address = address, token = restoreKey)
         saveSession(inbox, session.getString("id"), restoreKey)

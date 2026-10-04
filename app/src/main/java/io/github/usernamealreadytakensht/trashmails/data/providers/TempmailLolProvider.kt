@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
+import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
@@ -47,9 +48,9 @@ class TempmailLolProvider(private val http: HttpApi = Http, private val cache: M
         json.text("error")?.let { throw ProviderException("tempmail.lol: $it") }
         val now = System.currentTimeMillis()
         return Inbox(
-            id = json.getString("address"),
+            id = checkedAddress(json.getString("address"), provider),
             provider = provider,
-            address = json.getString("address"),
+            address = checkedAddress(json.getString("address"), provider),
             token = json.getString("token"),
             createdAt = now,
             expiresAt = now + LIFETIME_MS,

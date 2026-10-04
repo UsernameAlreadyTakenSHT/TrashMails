@@ -4,6 +4,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
+import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -94,7 +95,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
         return Inbox(
             id = account.getString("id"),
             provider = provider,
-            address = account.optString("address", address),
+            address = checkedAddress(account.optString("address", address), provider),
             token = password,
         )
     }

@@ -16,6 +16,14 @@ class SummaryBoundsTest {
     }
 
     @Test
+    fun serverAddresses_mustBePlain() {
+        assertEquals("ab.c+d@sub.example.com", checkedAddress("ab.c+d@sub.example.com", Provider.MAIL_TM))
+        for (bad in listOf("a@b", "a\n@b.com", "a@b.com‮", "a".repeat(100) + "@b.com", "a@b.com x", "@b.com")) {
+            assertTrue(bad, runCatching { checkedAddress(bad, Provider.MAIL_TM) }.isFailure)
+        }
+    }
+
+    @Test
     fun oversizedIdsOrRefs_areNotSane() {
         assertTrue(MailSummary(id = "abc", from = "", subject = "", date = 1, ref = mapOf("key" to "k")).isSane())
         assertFalse(MailSummary(id = "x".repeat(5_000), from = "", subject = "", date = 1).isSane())

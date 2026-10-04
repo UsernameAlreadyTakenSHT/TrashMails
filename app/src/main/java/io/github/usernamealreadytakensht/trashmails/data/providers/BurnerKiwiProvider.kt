@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
+import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -42,7 +43,7 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
         return Inbox(
             id = email.getString("id"),
             provider = provider,
-            address = email.getString("address"),
+            address = checkedAddress(email.getString("address"), provider),
             token = result.getString("token"),
             createdAt = email.optLong("created_at") * 1000,
             expiresAt = email.optLong("ttl").takeIf { it > 0 }?.let { it * 1000 },

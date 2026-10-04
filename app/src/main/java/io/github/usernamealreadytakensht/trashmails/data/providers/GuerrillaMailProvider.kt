@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
+import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailProvider
@@ -90,7 +91,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
         return Inbox(
             id = n,
             provider = provider,
-            address = "$local@$domain",
+            address = checkedAddress("$local@$domain", provider),
             // The session token is cached in memory only: it expires within the hour and is not a secret worth keeping.
             token = null,
             createdAt = json.optLong("email_timestamp").takeIf { it > 0 }?.let { it * 1000 }
