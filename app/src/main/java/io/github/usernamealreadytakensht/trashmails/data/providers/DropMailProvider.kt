@@ -43,6 +43,8 @@ class DropMailProvider(
         const val TOKEN_LIFETIME_MS = 24 * 3_600_000L
         /** A token is kept to its very end: the sessions opened with it cannot be reached with the next one. */
         const val TOKEN_MARGIN_MS = 0L
+        /** A token younger than this is not replaced on a 403: the refusal is more likely a firewall than the token. */
+        const val TOKEN_MIN_AGE_MS = 3_600_000L
         const val MAX_TOMBSTONES = 200
         const val KEY_TOKEN = "token"
         const val KEY_TOKEN_EXPIRES = "tokenExpiresAt"
@@ -204,13 +206,23 @@ class DropMailProvider(
         val reply = try {
             http.postJson(GRAPHQL_URL + token(), body)
         } catch (e: HttpException) {
-            if (e.code == 403 && retry) {
+            // A 403 may be the token rejected, or a firewall or rate limit: replacing the token
+            // strands every session opened with it, so it is replaced when the server says the
+            // token is the problem, and otherwise at most once an hour.
+            val tokenRejected = "authentication_error" in e.body || "token" in e.body.lowercase()
+            if (e.code == 403 && retry && (tokenRejected || tokenAgeMs() > TOKEN_MIN_AGE_MS)) {
                 prefs.put(KEY_TOKEN to "", KEY_TOKEN_EXPIRES to "")
                 return graphql(query, retry = false)
             }
             throw ProviderException("DropMail.me refused the request (HTTP ${e.code})")
         }
         return JSONObject(reply)
+    }
+
+    /** How long ago the stored token was handed out (its expiry is set a lifetime after that); long ago when there is none. */
+    private fun tokenAgeMs(): Long {
+        val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: return Long.MAX_VALUE
+        return System.currentTimeMillis() - (expiresAt - TOKEN_LIFETIME_MS)
     }
 
     /** The device's `af_` token, requested when there is none or it is about to run out. */

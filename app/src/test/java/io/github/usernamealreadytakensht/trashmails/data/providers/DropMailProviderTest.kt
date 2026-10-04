@@ -177,6 +177,17 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun aBare403_keepsAFreshToken() = runBlocking {
+        val prefs = MemoryPrefs()
+        // Handed out ten minutes ago (expires a day after that).
+        prefs.put("token" to "af_old", "tokenExpiresAt" to (System.currentTimeMillis() + 24 * 3_600_000L - 600_000L).toString())
+        val http = http().on("/api/graphql/af_old", httpError(403, "<html>Forbidden</html>"))
+        runCatching { provider(http, prefs).createInbox(null, CreateOptions()) }
+        assertEquals(listOf("/api/graphql/af_old"), http.urls().map { it.substringAfter("dropmail.me") })
+        assertEquals("af_old", prefs.getString("token"))
+    }
+
+    @Test
     fun deleteMessage_dropsTheLocalCopy_andKeepsItOutOfLaterListings() = runBlocking {
         val cache = MessageCache(MemoryPrefs())
         val prefs = MemoryPrefs()
