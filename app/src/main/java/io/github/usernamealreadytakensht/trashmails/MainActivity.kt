@@ -19,7 +19,11 @@ import io.github.usernamealreadytakensht.trashmails.ui.screens.HomeScreen
 import io.github.usernamealreadytakensht.trashmails.ui.screens.InboxScreen
 import io.github.usernamealreadytakensht.trashmails.ui.screens.MessageScreen
 import io.github.usernamealreadytakensht.trashmails.ui.screens.SettingsScreen
+import io.github.usernamealreadytakensht.trashmails.ui.screens.clearWebViewTraces
 import io.github.usernamealreadytakensht.trashmails.ui.theme.TrashMailsTheme
+
+/** Set once the WebView traces of an earlier run were cleared in this process. */
+private var webViewTracesCleared = false
 
 class MainActivity : ComponentActivity() {
     private val vm: MailViewModel by viewModels()
@@ -33,6 +37,12 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(false)
         // Set before the first frame: the effect below only runs once composed, too late for the recents thumbnail.
         if (vm.settings.blockScreenshots) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // Once per process, before any mail view exists: what an earlier run's WebView left on disk goes.
+        if (!webViewTracesCleared) {
+            webViewTracesCleared = true
+            val app = applicationContext
+            Thread { clearWebViewTraces(app) }.start()
+        }
         setContent {
             // FLAG_SECURE follows the setting live, so toggling it needs no restart.
             val blockScreenshots = vm.settings.blockScreenshots

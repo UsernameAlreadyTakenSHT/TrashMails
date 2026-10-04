@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.webkit.CookieManager
+import android.webkit.WebStorage
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -70,6 +71,7 @@ import io.github.usernamealreadytakensht.trashmails.ui.copyToClipboard
 import io.github.usernamealreadytakensht.trashmails.ui.formatDate
 import io.github.usernamealreadytakensht.trashmails.ui.localDeleteNote
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.net.IDN
 
 /**
@@ -313,7 +315,13 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
             }
         },
         // Leaving the message (or switching to plain text) frees the renderer at once.
-        onRelease = { view -> view.stopLoading(); view.clearCache(true); view.destroy() },
+        onRelease = { view ->
+            view.stopLoading()
+            view.clearCache(true)
+            WebStorage.getInstance().deleteAllData()
+            CookieManager.getInstance().removeAllCookies(null)
+            view.destroy()
+        },
     )
 }
 
@@ -385,6 +393,25 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
 
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
 private fun isAllowedLink(uri: Uri): Boolean = uri.scheme?.lowercase() in setOf("http", "https", "mailto")
+
+/** What Chromium may leave in the app's WebView directory once remote images were loaded. */
+private val WEBVIEW_TRACES = listOf(
+    "HTTP Cache", "Cache", "Code Cache", "GPUCache", "Network Persistent State", "TransportSecurity",
+    "Cookies", "Cookies-journal", "Local Storage", "Session Storage", "IndexedDB", "Service Worker",
+)
+
+/**
+ * Deletes what a WebView of an earlier run left on disk: the hosts a sender's images came from
+ * (network state, HSTS), storage, cookies. Called at start-up, before any WebView exists in this
+ * process, and off the main thread; [HtmlBody] clears what it can itself when it goes, but a process
+ * killed while a message was open never got there.
+ */
+fun clearWebViewTraces(context: Context) {
+    val root = File(context.dataDir, "app_webview")
+    for (dir in listOf(root, File(root, "Default"))) {
+        WEBVIEW_TRACES.forEach { runCatching { File(dir, it).deleteRecursively() } }
+    }
+}
 
 /** What Chrome itself sends with user-agent reduction: no model, no build, a frozen Android version. */
 private const val GENERIC_USER_AGENT =
