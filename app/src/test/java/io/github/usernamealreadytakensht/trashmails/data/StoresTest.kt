@@ -31,10 +31,15 @@ class InboxStoreTest {
         assertEquals(inboxes, store.load())
     }
 
-    /** Reverses the secret behind the sealed prefix: enough to see what is sealed and what is not. */
+    /**
+     * Reverses the secret behind the sealed prefix, the context after a "|": enough to see what is
+     * sealed and what is not, and that a value opens for its own context only.
+     */
     private val reversing = object : SecretBox {
-        override fun seal(plain: String) = "k1:" + plain.reversed()
-        override fun open(stored: String) = if (stored.startsWith("k1:")) stored.removePrefix("k1:").reversed() else stored
+        override fun seal(plain: String, context: String) = "k2:" + plain.reversed() + "|" + context
+        override fun open(stored: String, context: String) =
+            if (!stored.startsWith("k2:")) stored
+            else stored.removePrefix("k2:").split("|").let { (secret, sealedFor) -> if (sealedFor == context) secret.reversed() else null }
     }
 
     @Test
@@ -43,16 +48,31 @@ class InboxStoreTest {
         val sealing = InboxStore(prefs, reversing)
         assertEquals("pw", sealing.load().single().token)
         val stored = prefs.getString("list")!!
-        assertTrue(stored.contains("k1:wp") && !stored.contains("\"pw\""))
+        assertTrue(stored.contains("k2:wp|inbox-token:MAIL_TM:a") && !stored.contains("\"pw\""))
         assertEquals("pw", sealing.load().single().token)
+    }
+
+    @Test
+    fun sealedTokensSwappedBetweenAddresses_doNotOpen() {
+        val store = InboxStore(prefs, reversing)
+        store.save(listOf(
+            Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw-a", createdAt = 1L),
+            Inbox("b", Provider.MAIL_TM, "b@mail.tm", token = "pw-b", createdAt = 2L),
+        ))
+        // Someone with the files swaps the two sealed values.
+        val a = "k2:a-wp|inbox-token:MAIL_TM:a"
+        val b = "k2:b-wp|inbox-token:MAIL_TM:b"
+        val swapped = prefs.getString("list")!!.replace(a, "TMP").replace(b, a).replace("TMP", b)
+        prefs.put("list" to swapped)
+        assertEquals(listOf(null, null), InboxStore(prefs, reversing).load().map { it.token })
     }
 
     @Test
     fun aKeystoreFailingForAMoment_losesNoToken() {
         var failing = true
         val flaky = object : SecretBox {
-            override fun seal(plain: String) = reversing.seal(plain)
-            override fun open(stored: String) = if (failing) null else reversing.open(stored)
+            override fun seal(plain: String, context: String) = reversing.seal(plain, context)
+            override fun open(stored: String, context: String) = if (failing) null else reversing.open(stored, context)
         }
         InboxStore(prefs, reversing).save(listOf(Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw", createdAt = 1L)))
         // Loaded while the keystore fails, then saved (an address created meanwhile).
@@ -67,8 +87,8 @@ class InboxStoreTest {
     @Test
     fun aTokenThatCannotBeOpened_costsOnlyThatAddressItsAccess() {
         val failing = object : SecretBox {
-            override fun seal(plain: String) = "k1:x"
-            override fun open(stored: String): String? = null
+            override fun seal(plain: String, context: String) = "k2:x"
+            override fun open(stored: String, context: String): String? = null
         }
         val sealing = InboxStore(prefs, failing)
         sealing.save(listOf(Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw", createdAt = 1L)))

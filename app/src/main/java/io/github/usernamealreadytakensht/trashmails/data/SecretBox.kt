@@ -16,21 +16,26 @@ import javax.crypto.spec.GCMParameterSpec
  * its addresses.
  */
 interface SecretBox {
-    fun seal(plain: String): String
+    /**
+     * [plain] sealed for [context] (what the value is for, e.g. the inbox it belongs to): it opens
+     * for that context only, so sealed values swapped between entries in the files do not open.
+     */
+    fun seal(plain: String, context: String): String
     /** The secret, or null when it cannot be opened. A value stored before sealing existed comes back as is. */
-    fun open(stored: String): String?
+    fun open(stored: String, context: String): String?
 }
 
 /** No sealing: the JVM tests, and the fallback where the keystore is unusable. */
 object PlainBox : SecretBox {
-    override fun seal(plain: String) = plain
-    override fun open(stored: String): String? = if (stored.startsWith(KeystoreBox.PREFIX)) null else stored
+    override fun seal(plain: String, context: String) = plain
+    override fun open(stored: String, context: String): String? = if (KeystoreBox.isSealed(stored)) null else stored
 }
 
 /**
  * AES-256-GCM with a key that lives in the Android Keystore (hardware-backed where the device has
  * it) and never leaves it: copying the app's files, from a backup tool or a rooted shell, no longer
- * yields the secrets. Sealed values read `k1:` + Base64(IV + ciphertext).
+ * yields the secrets. Sealed values read `k2:` + Base64(IV + ciphertext), the context as associated
+ * data; `k1:` values (0.5.5 and 0.5.6, no context) still open, and are sealed again when read.
  *
  * One object for the whole process: two instances could each find no key and generate one under
  * the same alias at once, the second replacing the first. The key is looked up or generated once,
@@ -52,22 +57,32 @@ object KeystoreBox : SecretBox {
     }
 
     /** Sealed, or as is if the keystore fails (some devices): never worse than before sealing existed. */
-    override fun seal(plain: String): String = runCatching {
+    override fun seal(plain: String, context: String): String = runCatching {
         val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key) }
+        cipher.updateAAD(context.toByteArray())
         PREFIX + Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(plain.toByteArray()))
     }.getOrDefault(plain)
 
-    override fun open(stored: String): String? {
-        if (!stored.startsWith(PREFIX)) return stored
+    override fun open(stored: String, context: String): String? {
+        val legacy = stored.startsWith(LEGACY_PREFIX)
+        if (!legacy && !stored.startsWith(PREFIX)) return stored
         return runCatching {
-            val bytes = Base64.getDecoder().decode(stored.removePrefix(PREFIX))
+            val bytes = Base64.getDecoder().decode(stored.substring(PREFIX.length))
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes, 0, IV_BYTES))
+            if (!legacy) cipher.updateAAD(context.toByteArray())
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES))
         }.getOrNull()
     }
 
-    const val PREFIX = "k1:"
+    /** Sealed in either format. */
+    fun isSealed(stored: String) = stored.startsWith(PREFIX) || stored.startsWith(LEGACY_PREFIX)
+
+    /** Sealed in the current format: anything else (clear, or `k1:`) is worth sealing again. */
+    fun isCurrent(stored: String) = stored.startsWith(PREFIX)
+
+    const val PREFIX = "k2:"
+    private const val LEGACY_PREFIX = "k1:"
     private const val KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "trashmails-secrets"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"

@@ -8,6 +8,7 @@ import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
+import io.github.usernamealreadytakensht.trashmails.data.KeystoreBox
 import io.github.usernamealreadytakensht.trashmails.data.PlainBox
 import io.github.usernamealreadytakensht.trashmails.data.Prefs
 import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
@@ -51,6 +52,7 @@ class DropMailProvider(
         const val MAX_TOMBSTONES = 200
         val TOKEN_FORMAT = Regex("af_[A-Za-z0-9_-]{8,256}")
         const val KEY_TOKEN = "token"
+        const val TOKEN_CONTEXT = "dropmail-device-token"
         const val KEY_TOKEN_EXPIRES = "tokenExpiresAt"
         const val MAIL_FIELDS = "id receivedAt fromAddr headerFrom headerSubject text html toAddr toAddrOrig"
     }
@@ -236,9 +238,12 @@ class DropMailProvider(
     /** The device's `af_` token, requested when there is none or it is about to run out. */
     private suspend fun token(): String {
         val raw = prefs.getString(KEY_TOKEN)?.takeIf { it.isNotBlank() }
-        val stored = raw?.let(box::open)
-        // A token stored in clear by 0.5.4 and earlier is sealed the first time it is read.
-        if (stored != null && raw == stored && box !== PlainBox) prefs.put(KEY_TOKEN to box.seal(stored))
+        val stored = raw?.let { box.open(it, TOKEN_CONTEXT) }
+        // A token stored in clear or in the older format is sealed again the first time it is read,
+        // if sealing works right now.
+        if (stored != null && !KeystoreBox.isCurrent(raw)) {
+            box.seal(stored, TOKEN_CONTEXT).takeIf(KeystoreBox::isCurrent)?.let { prefs.put(KEY_TOKEN to it) }
+        }
         val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: 0L
         if (!stored.isNullOrBlank() && expiresAt - System.currentTimeMillis() > TOKEN_MARGIN_MS) return stored
         val json = try {
@@ -253,22 +258,27 @@ class DropMailProvider(
         val token = json.text("token") ?: throw ProviderException("DropMail.me sent no token")
         // It goes into the URL path as is: nothing but the token's own characters may get there.
         if (!TOKEN_FORMAT.matches(token)) throw ProviderException("DropMail.me sent a token the app cannot use")
-        prefs.put(KEY_TOKEN to box.seal(token), KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
+        prefs.put(KEY_TOKEN to box.seal(token, TOKEN_CONTEXT), KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
         return token
     }
 
     private fun sessionKey(inbox: Inbox) = "session:${inbox.key}"
+    /** What a restore key is sealed for: its address. */
+    private fun restoreContext(inbox: Inbox) = "dropmail-restore:${inbox.key}"
     private fun deletedKey(inbox: Inbox) = "deleted:${inbox.key}"
 
     /** The current session id (null when none was ever stored) and restore key of [inbox]. */
     private fun loadSession(inbox: Inbox): Pair<String?, String> {
         val o = prefs.getString(sessionKey(inbox))?.let { runCatching { JSONObject(it) }.getOrNull() }
         val raw = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }
-        val restoreKey = raw?.let(box::open) ?: inbox.token
+        val restoreKey = raw?.let { box.open(it, restoreContext(inbox)) } ?: inbox.token
             ?: throw ProviderException("Missing restore key")
         val sessionId = o?.optString("session")?.takeIf { it.isNotBlank() }
-        // A restore key stored in clear by 0.5.4 and earlier is sealed the first time it is read.
-        if (sessionId != null && raw == restoreKey && box !== PlainBox) saveSession(inbox, sessionId, restoreKey)
+        // A restore key stored in clear or in the older format is sealed again the first time it is
+        // read, if sealing works right now.
+        if (sessionId != null && raw != null && !KeystoreBox.isCurrent(raw) &&
+            KeystoreBox.isCurrent(box.seal("probe", "probe"))
+        ) saveSession(inbox, sessionId, restoreKey)
         return sessionId to restoreKey
     }
 
@@ -276,7 +286,7 @@ class DropMailProvider(
     private fun saveSession(inbox: Inbox, sessionId: String, restoreKey: String) {
         // Checked and written as one step under the cache lock, so it cannot land just after the removal.
         cache.unlessForgotten(inbox.key) {
-            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", box.seal(restoreKey)).toString())
+            prefs.put(sessionKey(inbox) to JSONObject().put("session", sessionId).put("restoreKey", box.seal(restoreKey, restoreContext(inbox))).toString())
         }
     }
 

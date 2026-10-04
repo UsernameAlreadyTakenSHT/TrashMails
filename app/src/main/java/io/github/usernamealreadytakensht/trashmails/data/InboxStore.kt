@@ -15,12 +15,13 @@ class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox
         // Keys deduplicated: the home list is keyed by them, and a duplicate would crash it at every launch.
         val inboxes = (0 until arr.length()).mapNotNull { i -> runCatching { fromJson(arr.getJSONObject(i)) }.getOrNull() }
             .distinctBy { it.key }
-        // Tokens stored in clear by 0.5.4 and earlier are sealed at once rather than at the next change,
-        // if sealing works right now (otherwise the same clear value would only be written back).
-        val clear = (0 until arr.length()).any { i ->
-            arr.optJSONObject(i)?.optString("token").orEmpty().let { it.isNotBlank() && !it.startsWith(KeystoreBox.PREFIX) }
+        // Tokens stored in clear (0.5.4 and earlier) or without context (0.5.5, 0.5.6) are sealed again
+        // at once rather than at the next change, if sealing works right now (otherwise the same
+        // value would only be written back).
+        val outdated = (0 until arr.length()).any { i ->
+            arr.optJSONObject(i)?.optString("token").orEmpty().let { it.isNotBlank() && !KeystoreBox.isCurrent(it) }
         }
-        if (clear && box.seal("probe").startsWith(KeystoreBox.PREFIX)) save(inboxes)
+        if (outdated && KeystoreBox.isCurrent(box.seal("probe", "probe"))) save(inboxes)
         return inboxes
     }
 
@@ -41,7 +42,7 @@ class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox
         .put("id", i.id)
         .put("provider", i.provider.name)
         .put("address", i.address)
-        .put("token", i.token?.let(box::seal) ?: unopened[i.key])
+        .put("token", i.token?.let { box.seal(it, tokenContext(i.key)) } ?: unopened[i.key])
         .put("createdAt", i.createdAt)
         .put("expiresAt", i.expiresAt)
 
@@ -51,7 +52,7 @@ class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox
         val stored = o.optString("token").takeIf { it.isNotBlank() && provider != Provider.GUERRILLA_MAIL }
         // A token that cannot be opened leaves this address without access for now, not the list;
         // its sealed value is kept to be written back (see [unopened]).
-        val token = stored?.let(box::open)
+        val token = stored?.let { box.open(it, tokenContext("${provider.name}:${o.getString("id")}")) }
         val inbox = Inbox(
             id = o.getString("id"),
             provider = provider,
@@ -63,6 +64,9 @@ class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox
         if (stored != null && token == null) unopened[inbox.key] = stored else unopened.remove(inbox.key)
         return inbox
     }
+
+    /** What a token is sealed for: its address. */
+    private fun tokenContext(inboxKey: String) = "inbox-token:$inboxKey"
 
     private companion object {
         const val KEY = "list"
