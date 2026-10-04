@@ -6,8 +6,6 @@ import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import io.github.usernamealreadytakensht.trashmails.data.Inbox
-import io.github.usernamealreadytakensht.trashmails.data.MailContent
-import io.github.usernamealreadytakensht.trashmails.data.MailProvider
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.PlainBox
@@ -35,11 +33,11 @@ import org.json.JSONObject
  */
 class DropMailProvider(
     private val http: HttpApi = Http,
-    private val cache: MessageCache,
+    override val cache: MessageCache,
     private val prefs: Prefs,
     /** Seals the device token and the restore keys before they reach [prefs]. */
     private val box: SecretBox = PlainBox,
-) : MailProvider {
+) : CacheBackedProvider {
     override val provider = Provider.DROPMAIL
 
     private companion object {
@@ -125,15 +123,6 @@ class DropMailProvider(
             (fresh + known).distinctBy { it.id }.filterNot { it.id in deleted }
         }
     }
-
-    override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
-        // The bodies travel with the summary; after a process death only the cached copy has them.
-        val m = summary.takeIf { it.html != null || it.text != null } ?: cache.load(inbox.key).firstOrNull { it.id == summary.id } ?: summary
-        return MailContent(html = m.html, text = m.text)
-    }
-
-    override val canDeleteMessages get() = true
-    override val deletesLocally get() = true
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
         // The server keeps the message as long as the session lives: remembered (before the copy
