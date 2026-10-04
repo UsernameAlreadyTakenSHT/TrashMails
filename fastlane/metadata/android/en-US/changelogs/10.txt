@@ -1,0 +1,7 @@
+Rest of the security review:
+- Passwords, tokens and restore keys stored sealed with an Android Keystore key
+- Mail view: DNS prefetching off, nothing remote loads while images are blocked
+- mailto links: recipients, subject and body only
+- "Block screenshots" also hides the screen from non-tool accessibility services
+- A damaged setting no longer keeps the app from starting
+- OkHttp 5.5.0

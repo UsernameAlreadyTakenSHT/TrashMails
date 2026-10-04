@@ -1,3 +1,19 @@
+## v0.5.5 — 2026-10-04
+
+The rest of the 0.5.3 security review: the points it rated informational.
+
+### Changed
+- **Stored secrets are sealed with an Android Keystore key**: mail.tm passwords, inbox tokens, DropMail.me restore keys and device token (AES-256-GCM, key never leaves the Keystore). Only those values are sealed, so a lost key costs one address its access, not the list. Secrets stored in clear by earlier versions are sealed at the first launch.
+- **The mail view turns DNS prefetching off**, and while remote content is blocked a Content-Security-Policy allows nothing but inline styles and data: images and fonts: a `<link rel=dns-prefetch>` can no longer tell the sender's DNS server the mail was opened.
+- **mailto links open a compose screen with recipients, subject and body only**: no cc or bcc the sender slipped in, no attachment request.
+- **"Block screenshots" also withholds the screen from accessibility services that are not accessibility tools** (Android 14+); TalkBack still reads it.
+- **The link confirmation setting says what turning it off exposes.**
+- **OkHttp 5.5.0** (4.12 only gets maintenance fixes).
+
+### Fixed
+- **A damaged setting no longer keeps the app from starting**: each falls back to its default on its own.
+- **Guerrilla Mail: a listing without the inbox name is no longer taken as the inbox's own.**
+
 ## v0.5.4 — 2026-10-04
 
 A five-angle security review of 0.5.3 (sender-controlled content, hostile servers, data on the device, platform and build, resilience) and the fixes for everything it found.
