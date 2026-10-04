@@ -38,6 +38,17 @@ jobs:
       - name: Test, lint, build the release APK (unsigned)
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleRelease
 
+      # What a reproducible build is checked against: the same tree, built on Linux, must give these
+      # bytes (the released APK is this one plus its signature block).
+      - name: Unsigned APK checksum
+        run: |
+          {
+            echo "### Unsigned release APK"
+            echo '```'
+            sha256sum app/build/outputs/apk/release/*.apk
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
