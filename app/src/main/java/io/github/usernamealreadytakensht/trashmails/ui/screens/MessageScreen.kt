@@ -531,7 +531,7 @@ private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy
  */
 private fun atStart(html: String, meta: String): String {
     var i = 0
-    while (i < html.length && (html[i] == '﻿' || html[i].isWhitespace())) i++
+    while (i < html.length && (html[i] == '\uFEFF' || html[i].isWhitespace())) i++
     if (html.regionMatches(i, "<!doctype", 0, 9, ignoreCase = true)) {
         val end = html.indexOf('>', i)
         if (end >= 0) return html.substring(0, end + 1) + meta + html.substring(end + 1)
