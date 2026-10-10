@@ -1,0 +1,7 @@
+Security review fixes:
+- A keystore failure no longer wipes kept emails
+- DropMail.me: restore key and token can no longer be lost or lock the app
+- HTML view: link tags disarmed, doctype trick closed
+- Link dialog shows links whole; mailto links checked before handing over
+- Sender line shown whole
+- Kotlin 2.4.21

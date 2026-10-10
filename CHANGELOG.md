@@ -1,3 +1,10 @@
+## v0.5.9 — 2026-10-10
+
+0.5.8 again, with its APK: the repository's releases became immutable just before 0.5.8 was published, which froze that release before the APK could be attached. No change in the app; see 0.5.8 below for what it brings.
+
+### Changed
+- **Releases are published as drafts first**, the APK attached, then made public (and immutable).
+
 ## v0.5.8 — 2026-10-10
 
 Another three-angle security review, of 0.5.7 this time, and the fixes for what it found.
