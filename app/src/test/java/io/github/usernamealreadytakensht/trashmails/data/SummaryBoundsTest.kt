@@ -26,6 +26,7 @@ class SummaryBoundsTest {
     fun aBodyLosesItsBidiControls_soALinkReadsAsWhatItIs() {
         val body = "Click \u202E\u2066https://evil.example/\u2069\u2066https://bank.com/login?next=\u2069\u202C now"
         assertEquals("Click https://evil.example/https://bank.com/login?next= now", body.withoutBidiControls())
+        assertEquals("ab", "a\u061Cb".withoutBidiControls())
     }
 
     @Test

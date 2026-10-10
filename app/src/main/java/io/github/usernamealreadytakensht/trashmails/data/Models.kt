@@ -114,8 +114,8 @@ private const val MAX_HEADER_CHARS = 1_000
 /** Longest id or reference value accepted from a provider. */
 private const val MAX_ID_CHARS = 1_000
 
-/** Bidirectional controls: they make a sender or subject display other than what it is (RLO, isolates, marks). */
-private val BIDI_CONTROLS = Regex("[\u200E\u200F\u202A-\u202E\u2066-\u2069]")
+/** Bidirectional controls: they make a sender or subject display other than what it is (RLO, isolates, marks, ALM). */
+private val BIDI_CONTROLS = Regex("[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]")
 
 /** Without bidirectional controls: what is shown reads in the order it is stored, links included. */
 fun String.withoutBidiControls(): String = replace(BIDI_CONTROLS, "")
