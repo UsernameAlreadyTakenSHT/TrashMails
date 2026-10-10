@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -5,10 +6,17 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Release signing: keystore.properties is git-ignored; without it the release build stays unsigned.
+// Release signing, kept out of the repository: the properties file named by
+// TRASHMAILS_KEYSTORE_PROPERTIES, else ~/.trashmails/keystore.properties (a keystore.properties at
+// the root, git-ignored, is still read as a last resort). Its storeFile is relative to that file.
+// Without one, the release build stays unsigned (as F-Droid builds it).
+val keystorePropsFile = listOfNotNull(
+    System.getenv("TRASHMAILS_KEYSTORE_PROPERTIES")?.let(::File),
+    File(System.getProperty("user.home"), ".trashmails/keystore.properties"),
+    rootProject.file("keystore.properties"),
+).firstOrNull { it.isFile }
 val keystoreProps = Properties().apply {
-    val f = rootProject.file("keystore.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
+    keystorePropsFile?.inputStream()?.use { load(it) }
 }
 
 android {
@@ -28,7 +36,7 @@ android {
     signingConfigs {
         if (keystoreProps.isNotEmpty()) {
             create("release") {
-                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storeFile = keystorePropsFile!!.parentFile.resolve(keystoreProps.getProperty("storeFile"))
                 storePassword = keystoreProps.getProperty("storePassword")
                 keyAlias = keystoreProps.getProperty("keyAlias")
                 keyPassword = keystoreProps.getProperty("keyPassword")
