@@ -1,0 +1,7 @@
+Security review fixes:
+- A brief keystore failure no longer erases a saved password or token
+- Kept emails are encrypted on disk and dropped after a week
+- HTML view: privacy protections can no longer be bypassed by the email
+- Plain-text links and mail links can no longer disguise where they lead
+- DropMail.me: deleted or expired mail stays gone; token and session kept safer
+- "Load remote content" replaces "Load remote images"

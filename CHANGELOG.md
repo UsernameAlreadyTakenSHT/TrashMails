@@ -1,3 +1,27 @@
+## v0.5.7 — 2026-10-10
+
+A three-angle security review of 0.5.6 (sender-controlled content, providers and storage, CI and platform) and the fixes for what it found.
+
+### Fixed
+- **A keystore failing for a moment no longer erases a sealed token**: the next save dropped it for good (for mail.tm the password, and with it the account). Its sealed value is now kept and written back as it was.
+- **The mail view's privacy meta tags always land in the head**: a `<head>` in a comment, an attribute or a title let a sender leave the Content-Security-Policy inert in the body (checked with headless Chromium). They now go at the start of the document.
+- **Explicit prefetch links are disarmed while remote content is blocked**: `<link rel=dns-prefetch>`, `preconnect` or `prefetch` could still reach the sender's host.
+- **A link in plain text reads as what it opens**: bidi controls in a message body could make `https://evil.example/` read as `https://bank.com/…`. They are removed from message text.
+- **The link dialog shows a mail link's recipients only**, one per line: a subject full of line breaks could push an added recipient out of sight.
+- **Sender and recipient lines are one line each**, bounded on screen: line breaks could push the real address away or fake extra lines.
+- **DropMail.me**: mail dropped from the local copy (kept a week, or past its bounds) no longer comes back from the session; an unreadable but valid device token is no longer replaced (which stranded every session); a new restore key is on disk before going on.
+- **mail.tm listings keep memory bounded**: pages are reduced to summaries as they come, 150 at most.
+- **Message files are synced before replacing the old ones**, and a temporary file left by an interrupted write goes with its address.
+
+### Changed
+- **Kept emails are sealed on disk** with the Keystore key, like the tokens; files written before are sealed when first read.
+- **Kept emails of addresses never reopened are dropped after a week too.**
+- **Sealed secrets are bound to what they are for** (format `k2:`): sealed values swapped between entries in the app's files no longer open. Older values are sealed again when read.
+- **One Keystore key holder for the whole app**, so the key cannot be generated twice at first use.
+- **"Load remote content"** replaces "Load remote images": styles, fonts, frames and media load with it too.
+- **README**: the signing certificate's fingerprint, to check a downloaded APK; **SECURITY.md** says how to report a vulnerability privately.
+- **CI**: the open-source Gradle cache, and the unsigned APK's checksum in each run's summary. The repository's `main` branch and release tags are now protected against force-push, moving and deletion.
+
 ## v0.5.6 — 2026-10-04
 
 Lighter refreshes, a few interface fixes, and continuous integration.
