@@ -7,6 +7,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MemoryPrefs
 import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.SecretBox
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.body
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.fixture
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.httpError
@@ -187,6 +188,24 @@ class DropMailProviderTest {
         runCatching { provider(http, prefs).createInbox(null, CreateOptions()) }
         assertEquals(listOf("/api/graphql/af_old"), http.urls().map { it.substringAfter("dropmail.me") })
         assertEquals("af_old", prefs.getString("token"))
+    }
+
+    @Test
+    fun anUnopenedRestoreKey_isNeverReplacedByTheFirstOne() = runBlocking {
+        // Seals for real; a k1: value (an older format) does not open.
+        val box = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$context|$plain"
+            override fun open(stored: String, context: String): String? =
+                if (stored.startsWith("k1:")) null
+                else if (!stored.startsWith("k2:")) stored
+                else stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v else null }
+        }
+        val prefs = MemoryPrefs()
+        val stored = """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k1:current"}"""
+        prefs.put("session:${inbox.key}" to stored)
+        val p = DropMailProvider(http().onBody("session(id:", fixture("dropmail_session")), MessageCache(MemoryPrefs()), prefs, box)
+        p.listMessages(inbox)
+        assertEquals(stored, prefs.getString("session:${inbox.key}"))
     }
 
     @Test

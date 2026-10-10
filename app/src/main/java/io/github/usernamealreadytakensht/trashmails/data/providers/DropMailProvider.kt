@@ -17,6 +17,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
+import io.github.usernamealreadytakensht.trashmails.data.works
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -290,14 +291,19 @@ class DropMailProvider(
     private fun loadSession(inbox: Inbox): Pair<String?, String> {
         val o = prefs.getString(sessionKey(inbox))?.let { runCatching { JSONObject(it) }.getOrNull() }
         val raw = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }
-        val restoreKey = raw?.let { box.open(it, restoreContext(inbox)) } ?: inbox.token
-            ?: throw ProviderException("Missing restore key")
+        val opened = raw?.let { box.open(it, restoreContext(inbox)) }
+        // Stored but unopenable while the keystore fails: it may be the only valid key, so the
+        // refresh fails and is retried. The address's first key is only a fallback for a damaged one.
+        if (raw != null && opened == null && !box.works()) {
+            throw ProviderException("DropMail.me: the restore key cannot be read right now, try again in a moment")
+        }
+        val restoreKey = opened ?: inbox.token ?: throw ProviderException("Missing restore key")
         val sessionId = o?.optString("session")?.takeIf { it.isNotBlank() }
         // A restore key stored in clear or in the older format is sealed again the first time it is
-        // read, if sealing works right now.
-        if (sessionId != null && raw != null && !KeystoreBox.isCurrent(raw) &&
-            KeystoreBox.isCurrent(box.seal("probe", "probe"))
-        ) saveSession(inbox, sessionId, restoreKey)
+        // read, if sealing works right now; only one that did open (never the fallback).
+        if (sessionId != null && opened != null && !KeystoreBox.isCurrent(raw) && KeystoreBox.isCurrent(box.seal("probe", "probe"))) {
+            saveSession(inbox, sessionId, opened)
+        }
         return sessionId to restoreKey
     }
 
