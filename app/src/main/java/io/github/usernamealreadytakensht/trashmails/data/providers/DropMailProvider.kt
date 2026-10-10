@@ -79,6 +79,7 @@ class DropMailProvider(
     private var domainIds: Map<String, String>? = null
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
+        noAddressLeft = false
         val domainId = options.domain?.takeIf { it in provider.domains }?.let { domainId(it) }
         // Left to the server, the pick stays among the permanent domains (the ones the dialog lists).
         val input = if (domainId != null) "domainId: ${quote(domainId)}" else "permanentDomainOnly: true"
@@ -172,7 +173,20 @@ class DropMailProvider(
      * The device token goes with the last address: whoever read it from the app's files could
      * otherwise list its sessions, and so the restore keys of addresses already removed.
      */
-    override fun forgetAll() = prefs.remove(KEY_TOKEN, KEY_TOKEN_EXPIRES)
+    override fun forgetAll() {
+        noAddressLeft = true
+        prefs.remove(KEY_TOKEN, KEY_TOKEN_EXPIRES)
+    }
+
+    /**
+     * Set once the last address is removed, until one is created: a request still in flight then
+     * must not write the device token back (it went with the last address).
+     */
+    @Volatile private var noAddressLeft = false
+
+    private fun putToken(vararg entries: Pair<String, Any>) {
+        if (!noAddressLeft) prefs.put(*entries)
+    }
 
     override fun forgetInbox(inbox: Inbox) {
         // One step under the cache lock: a restoration in flight cannot save its session in between.
@@ -250,7 +264,7 @@ class DropMailProvider(
             // token is the problem, and otherwise at most once an hour.
             val tokenRejected = "authentication_error" in e.body || "token" in e.body.lowercase()
             if (e.code == 403 && retry && (tokenRejected || tokenAgeMs() > TOKEN_MIN_AGE_MS)) {
-                prefs.put(KEY_TOKEN to "", KEY_TOKEN_EXPIRES to "")
+                putToken(KEY_TOKEN to "", KEY_TOKEN_EXPIRES to "")
                 return graphql(query, retry = false)
             }
             throw ProviderException("DropMail.me refused the request (HTTP ${e.code})")
@@ -271,7 +285,7 @@ class DropMailProvider(
         // A token stored in clear or in the older format is sealed again the first time it is read,
         // if sealing works right now.
         if (stored != null && !KeystoreBox.isCurrent(raw)) {
-            box.seal(stored, TOKEN_CONTEXT).takeIf(KeystoreBox::isCurrent)?.let { prefs.put(KEY_TOKEN to it) }
+            box.seal(stored, TOKEN_CONTEXT).takeIf(KeystoreBox::isCurrent)?.let { putToken(KEY_TOKEN to it) }
         }
         val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: 0L
         // Valid only within one token lifetime from now: an expiry further out (a clock set ahead
@@ -298,7 +312,7 @@ class DropMailProvider(
         val token = json.text("token") ?: throw ProviderException("DropMail.me sent no token")
         // It goes into the URL path as is: nothing but the token's own characters may get there.
         if (!TOKEN_FORMAT.matches(token)) throw ProviderException("DropMail.me sent a token the app cannot use")
-        prefs.put(KEY_TOKEN to box.seal(token, TOKEN_CONTEXT), KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
+        putToken(KEY_TOKEN to box.seal(token, TOKEN_CONTEXT), KEY_TOKEN_EXPIRES to (System.currentTimeMillis() + TOKEN_LIFETIME_MS).toString())
         return token
     }
 
