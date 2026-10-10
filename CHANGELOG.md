@@ -1,3 +1,24 @@
+## v0.5.8 — 2026-10-10
+
+Another three-angle security review, of 0.5.7 this time, and the fixes for what it found.
+
+### Fixed
+- **A keystore failing for a moment no longer wipes the kept emails**: an address's message file that cannot be opened is left alone, new mail waits in a side file and is merged back once it opens again.
+- **DropMail.me never replaces a restore key it could not open** with a new one, and an unreadable device token can no longer lock the provider for ever: it only blocks while the keystore itself fails.
+- **DropMail.me keeps the list of received ids bounded** (500 ids), recorded after the local copy and under its lock; oversized ids from the server are ignored.
+- **DropMail.me: removing the last address keeps the device token gone** instead of a refresh bringing it back.
+- **An address removed then created again in the same run** keeps its mail again.
+- **Mail view**: only HTML whitespace is skipped before the doctype, so the privacy tags cannot be pushed behind it; `<link>` elements are disarmed as a whole while remote content is blocked, whatever their `rel`; the viewport meta is always given, the email's own one still wins.
+- **Link dialog**: nothing is cut any more, the scrollable text shows a punycode host first, then its readable form.
+- **mailto: links** are decoded by the app: the mail app receives the checked recipients, subject and body as fields, never the raw link.
+- **U+061C (Arabic letter mark)** is removed with the other bidi controls.
+- **The sender line is shown whole**, so a long display name can no longer hide the address.
+
+### Changed
+- **Kotlin 2.4.21.**
+- **Release signing is read from outside the repository** (`~/.trashmails`, or a path in `TRASHMAILS_KEYSTORE_PROPERTIES`).
+- **GitHub**: releases are immutable once published, and `main` only accepts commits whose CI passed.
+
 ## v0.5.7 — 2026-10-10
 
 A three-angle security review of 0.5.6 (sender-controlled content, providers and storage, CI and platform) and the fixes for what it found.
