@@ -92,14 +92,23 @@ object KeystoreBox : SecretBox {
 /**
  * [Prefs] whose values are sealed by [box] before they reach [inner], each for "[purpose]:key". A
  * value that cannot be opened reads as missing; one stored before sealing reads as it is, and is
- * sealed at its next write.
+ * sealed when first read.
  */
 class SealedPrefs(private val inner: Prefs, private val box: SecretBox, private val purpose: String) : Prefs {
     private fun context(key: String) = "$purpose:$key"
     private fun sealed(entries: Array<out Pair<String, Any>>) =
         entries.map { (key, value) -> key to box.seal(value.toString(), context(key)) }.toTypedArray()
 
-    override fun getString(key: String): String? = inner.getString(key)?.let { box.open(it, context(key)) }
+    override fun getString(key: String): String? {
+        val raw = inner.getString(key) ?: return null
+        val value = box.open(raw, context(key)) ?: return null
+        // Stored before sealing: sealed now (if sealing works) rather than at a next write that
+        // may never come for an address that gets no more mail.
+        if (!KeystoreBox.isCurrent(raw)) {
+            box.seal(value, context(key)).takeIf(KeystoreBox::isCurrent)?.let { inner.put(key to it) }
+        }
+        return value
+    }
     override fun getInt(key: String, default: Int): Int = getString(key)?.toIntOrNull() ?: default
     override fun getBoolean(key: String, default: Boolean): Boolean = getString(key)?.toBooleanStrictOrNull() ?: default
     override fun put(vararg entries: Pair<String, Any>) = inner.put(*sealed(entries))
