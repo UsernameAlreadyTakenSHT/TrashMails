@@ -147,16 +147,11 @@ fun MessageScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                // Bounded in lines too: a long name must not push the real address off the screen.
-                Text(
-                    summary.from.ifBlank { "(unknown sender)" }, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                )
+                // Shown whole: it is one line already (line breaks removed, 1000 characters at most),
+                // and cutting its end hid the address behind a long display name.
+                Text(summary.from.ifBlank { "(unknown sender)" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 summary.to?.let {
-                    Text(
-                        "to $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    )
+                    Text("to $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
                     "${formatDate(summary.date)} · ${provider.label}",
