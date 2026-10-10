@@ -15,9 +15,11 @@ class ViewportTest {
 
     @Test
     fun explicitPrefetchLinks_areDisarmedWhileBlocked() {
-        val html = "<link rel=dns-prefetch href=//a.evil><link REL = \"preconnect\" href=https://b.evil>"
+        val html = "<link rel=dns-prefetch href=//a.evil><LINK\nrel=preconnect href=https://b.evil><a href=\"https://x/?a=1&rel=abc\">r</a>"
         val blocked = withPrivacyMeta(html, blockRemote = true)
-        assertTrue(blocked, blocked.contains("<link data-rel=dns-prefetch") && blocked.contains("<link data-rel= \"preconnect\""))
+        assertTrue(blocked, blocked.contains("<x-link rel=dns-prefetch") && blocked.contains("<x-link\nrel=preconnect"))
+        // Addresses holding "rel=" are left as they are.
+        assertTrue(blocked.contains("https://x/?a=1&rel=abc"))
         assertTrue(withPrivacyMeta(html, blockRemote = false).contains("<link rel=dns-prefetch"))
     }
 

@@ -514,19 +514,21 @@ internal fun withViewport(html: String): String =
 /**
  * [html] with Chromium's own DNS prefetching off (it would resolve the hosts of plain links,
  * telling the sender's DNS server the mail was opened; once off it cannot be turned back on) and,
- * while [blockRemote], explicit prefetch links disarmed ([REL_ATTRIBUTE]) and a policy allowing
+ * while [blockRemote], link elements disarmed ([LINK_TAG]) and a policy allowing
  * nothing but inline styles and data: images and fonts, a third guard behind the two in [HtmlBody].
  */
 internal fun withPrivacyMeta(html: String, blockRemote: Boolean): String =
-    if (blockRemote) atStart(html.replace(REL_ATTRIBUTE, "data-rel="), NO_DNS_PREFETCH + BLOCK_ALL_POLICY)
+    if (blockRemote) atStart(html.replace(LINK_TAG, "<x-link"), NO_DNS_PREFETCH + BLOCK_ALL_POLICY)
     else atStart(html, NO_DNS_PREFETCH)
 
 /**
- * Every `rel=` attribute, renamed while remote content is blocked: the prefetch control above only
- * covers Chromium's own prefetching, not an explicit `<link rel=dns-prefetch>`, `preconnect` or
- * `prefetch`, which resolve or reach the sender's host with no request to intercept.
+ * Every `<link>` element, turned into an unknown (inert) one while remote content is blocked: the
+ * prefetch control above only covers Chromium's own prefetching, not an explicit
+ * `<link rel=dns-prefetch>`, `preconnect` or `prefetch`, which resolve or reach the sender's host
+ * with no request to intercept. (Renaming every `rel=` instead also altered addresses and text
+ * holding "rel=".)
  */
-private val REL_ATTRIBUTE = Regex("""(?i)\brel\s*=""")
+private val LINK_TAG = Regex("""(?i)<link(?=[\s/>])""")
 
 private const val NO_DNS_PREFETCH = "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\">"
 private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
