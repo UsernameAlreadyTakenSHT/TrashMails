@@ -523,6 +523,9 @@ private const val NO_DNS_PREFETCH = "<meta http-equiv=\"x-dns-prefetch-control\"
 private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
     "img-src data:; font-src data:; style-src 'unsafe-inline'; form-action 'none'\">"
 
+/** The characters the HTML parser takes as whitespace (Kotlin's isWhitespace takes many more). */
+private const val HTML_WHITESPACE = " \t\n\u000C\r"
+
 /**
  * [meta] placed at the very start of the document, after a leading doctype if there is one: the
  * parser puts it in the (implicit) head whatever follows. Searching for the sender's own `<head>`
@@ -530,8 +533,12 @@ private const val BLOCK_ALL_POLICY = "<meta http-equiv=\"Content-Security-Policy
  * after some body content, left the meta inert there, policy included.
  */
 private fun atStart(html: String, meta: String): String {
-    var i = 0
-    while (i < html.length && (html[i] == '\uFEFF' || html[i].isWhitespace())) i++
+    // Only what the HTML parser itself skips before a doctype: one byte order mark at the very start,
+    // then its five whitespace characters. Kotlin's isWhitespace also takes U+00A0, U+2028 and the
+    // like, which the parser takes as text: it opens the body there, and the meta after the doctype
+    // landed in the body, policy ignored.
+    var i = if (html.startsWith('\uFEFF')) 1 else 0
+    while (i < html.length && html[i] in HTML_WHITESPACE) i++
     if (html.regionMatches(i, "<!doctype", 0, 9, ignoreCase = true)) {
         val end = html.indexOf('>', i)
         if (end >= 0) return html.substring(0, end + 1) + meta + html.substring(end + 1)

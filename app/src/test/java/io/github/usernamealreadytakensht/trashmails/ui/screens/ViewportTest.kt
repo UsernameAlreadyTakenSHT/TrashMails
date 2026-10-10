@@ -22,6 +22,17 @@ class ViewportTest {
     }
 
     @Test
+    fun onlyHtmlWhitespaceIsSkipped_beforeTheDoctype() {
+        // Text to the HTML parser (it opens the body): the meta must come before it, not after the doctype.
+        for (lead in listOf("\u00A0", "\u2028", " \uFEFF", "\uFEFF\uFEFF", "\u000B")) {
+            val out = withPrivacyMeta(lead + "<!DOCTYPE html><img src=http://x>", blockRemote = true)
+            assertTrue(lead, out.startsWith("<meta http-equiv=\"x-dns-prefetch-control\""))
+        }
+        val ok = withPrivacyMeta("\uFEFF \t\r\n\u000C<!DOCTYPE html><p>x</p>", blockRemote = true)
+        assertTrue(ok.startsWith("\uFEFF \t\r\n\u000C<!DOCTYPE html><meta"))
+    }
+
+    @Test
     fun aSendersHeadCannotChooseWhereThePolicyLands() {
         // A <head> in a comment, an attribute or a title, or after body content, left the meta inert.
         for (html in listOf(
