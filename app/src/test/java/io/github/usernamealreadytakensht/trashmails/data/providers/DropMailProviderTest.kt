@@ -209,6 +209,17 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun hugeIdsFromTheServer_areNeitherKeptNorRecorded() = runBlocking {
+        val prefs = MemoryPrefs()
+        prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")
+        val huge = "x".repeat(200_000)
+        val reply = """{"data":{"session":{"id":"s","mails":[{"id":"$huge","receivedAt":"2026-01-01T00:00:00Z","text":"t"}]}}}"""
+        val p = provider(http().onBody("session(id:", body(reply)), prefs, MessageCache(MemoryPrefs()))
+        assertEquals(0, p.listMessages(inbox).size)
+        assertTrue((prefs.getString("received:${inbox.key}") ?: "").length < 1_000)
+    }
+
+    @Test
     fun aMailDroppedFromTheCache_doesNotComeBack() = runBlocking {
         val prefs = MemoryPrefs()
         prefs.put("session:${inbox.key}" to """{"session":"U2Vzc2lvbjrZmdj6-cBPCqyLi5_vdC97","restoreKey":"k"}""")

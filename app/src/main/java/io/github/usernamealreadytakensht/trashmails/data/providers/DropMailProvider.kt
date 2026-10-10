@@ -2,6 +2,7 @@ package io.github.usernamealreadytakensht.trashmails.data.providers
 
 import io.github.usernamealreadytakensht.trashmails.data.CreateOptions
 import io.github.usernamealreadytakensht.trashmails.data.checkedAddress
+import io.github.usernamealreadytakensht.trashmails.data.isSane
 import io.github.usernamealreadytakensht.trashmails.data.Http
 import io.github.usernamealreadytakensht.trashmails.data.HttpApi
 import io.github.usernamealreadytakensht.trashmails.data.HttpException
@@ -53,6 +54,10 @@ class DropMailProvider(
         const val MAX_TOMBSTONES = 200
         /** A session lists 100 mails at most: this many ids cover it with room to spare. */
         const val MAX_RECEIVED = 500
+        /** And this many characters of them: a server cannot make the file grow with huge ids. */
+        const val MAX_RECEIVED_CHARS = 64 * 1024
+        /** Longest message id kept; real ones are a few dozen characters. */
+        const val MAX_ID_CHARS = 1_000
         val TOKEN_FORMAT = Regex("af_[A-Za-z0-9_-]{8,256}")
         const val KEY_TOKEN = "token"
         const val TOKEN_CONTEXT = "dropmail-device-token"
@@ -106,7 +111,8 @@ class DropMailProvider(
         // deleted: the server lists them as long as the session lives, and they must not come back.
         val received = received(inbox)
         val held = cache.load(inbox.key).map { it.id }.toSet() + tombstones(inbox) + received
-        val unseen = (0 until ids.length()).mapNotNull { ids.optJSONObject(it)?.text("id") }.filterNot { it in held }
+        val unseen = (0 until ids.length()).mapNotNull { ids.optJSONObject(it)?.text("id") }
+            .filter { it.length <= MAX_ID_CHARS }.filterNot { it in held }
         if (unseen.isEmpty()) return cache.load(inbox.key)
         val full = graphql("{ session(id: ${quote(sessionId)}) { id mails { $MAIL_FIELDS } } }")
         val arr = full.data("session")?.optJSONArray("mails") ?: fail(full, "DropMail.me could not list the inbox")
@@ -123,14 +129,28 @@ class DropMailProvider(
                 // Only an extended address is worth showing: the plain one is the inbox itself.
                 to = m.text("toAddrOrig")?.takeIf { it != m.text("toAddr") },
             )
+        }.filter { it.isSane() } // an absurd id would go into the received list, and on disk
+        // Merged under the cache lock, tombstones and received ids read there too: a deletion or
+        // another listing running meanwhile must not be undone by this one. The ids are recorded
+        // once the cache is written, and only those it kept: one cut by its bounds stays to come.
+        var kept: List<MailSummary> = emptyList()
+        cache.unlessForgotten(inbox.key) {
+            val receivedNow = received(inbox)
+            kept = cache.update(inbox.key) { known ->
+                val deleted = tombstones(inbox)
+                (fresh.filterNot { it.id in receivedNow } + known).distinctBy { it.id }.filterNot { it.id in deleted }
+            }
+            val keptIds = kept.map { it.id }.toSet()
+            recordReceived(inbox, receivedNow + fresh.map { it.id }.filter { it in keptIds })
         }
-        // Merged under the cache lock, tombstones read there too: a deletion running meanwhile
-        // (leaving a message screen starts a poll) must not be undone by this listing.
-        return cache.update(inbox.key) { known ->
-            val deleted = tombstones(inbox)
-            prefs.put(receivedKey(inbox) to JSONArray((received + fresh.map { it.id }).distinct().takeLast(MAX_RECEIVED)).toString())
-            (fresh.filterNot { it.id in received } + known).distinctBy { it.id }.filterNot { it.id in deleted }
-        }
+        return kept
+    }
+
+    /** Stores [ids] as received for [inbox]: the latest, bounded in count and in size. */
+    private fun recordReceived(inbox: Inbox, ids: List<String>) {
+        var bounded = ids.distinct().takeLast(MAX_RECEIVED)
+        while (bounded.sumOf { it.length } > MAX_RECEIVED_CHARS) bounded = bounded.drop(1)
+        prefs.put(receivedKey(inbox) to JSONArray(bounded).toString())
     }
 
     override suspend fun deleteMessage(inbox: Inbox, summary: MailSummary): Boolean {
