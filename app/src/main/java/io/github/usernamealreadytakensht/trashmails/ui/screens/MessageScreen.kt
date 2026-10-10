@@ -502,9 +502,12 @@ private val MAIL_ADDRESS = Regex("""[^\s,;?&=#<>"]+@[^\s,;?&=#<>"]+""")
 
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 
-/** HTML emails rarely declare a viewport; without one the WebView renders them tiny. */
-internal fun withViewport(html: String): String =
-    if (html.contains("name=\"viewport\"", ignoreCase = true)) html else atStart(html, VIEWPORT)
+/**
+ * HTML emails rarely declare a viewport; without one the WebView renders them tiny. Always given
+ * first: one the email declares comes later and wins (looking for it first was fooled by the same
+ * text in a comment).
+ */
+internal fun withViewport(html: String): String = atStart(html, VIEWPORT)
 
 /**
  * [html] with Chromium's own DNS prefetching off (it would resolve the hosts of plain links,

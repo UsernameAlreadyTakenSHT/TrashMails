@@ -48,10 +48,11 @@ class ViewportTest {
     }
 
     @Test
-    fun prependedWithoutAHead_andLeftAloneWhenDeclared() {
+    fun prependedWithoutAHead_andBeforeOneDeclared() {
         assertEquals("$meta<p>x</p>", withViewport("<p>x</p>"))
+        // The email's own one comes after ours, and wins.
         val declared = "<meta name=\"viewport\" content=\"width=500\"><p>x</p>"
-        assertEquals(declared, withViewport(declared))
+        assertEquals("$meta$declared", withViewport(declared))
     }
 
     @Test
