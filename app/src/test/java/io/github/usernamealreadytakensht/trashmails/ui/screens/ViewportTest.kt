@@ -78,12 +78,21 @@ class ViewportTest {
     }
 
     @Test
-    fun mailto_keepsRecipientsSubjectAndBodyOnly() {
+    fun mailto_keepsRecipientsSubjectAndBodyOnly_decoded() {
         assertEquals(
-            "mailto:a@b.c?subject=Hi&body=x%20y",
-            plainMailto("mailto:a@b.c?cc=spy@evil.com&subject=Hi&bcc=x@y.z&attach=/sdcard/a&body=x%20y"),
+            MailDraft(listOf("a@b.c"), "Hi", "x y"),
+            parseMailto("mailto:a@b.c?cc=spy@evil.com&subject=Hi&bcc=x@y.z&attach=/sdcard/a&body=x%20y"),
         )
-        assertEquals("mailto:a@b.c", plainMailto("mailto:a@b.c?bcc=x@y.z"))
+        assertEquals(MailDraft(listOf("a@b.c"), null, null), parseMailto("mailto:a@b.c?bcc=x@y.z"))
+    }
+
+    @Test
+    fun mailto_anEncodedAmpersandCannotSmuggleAField() {
+        val draft = parseMailto("mailto:me@bank.com?subject=Hi%26cc%3Devil%40attacker.com%26bcc%3Dspy%40attacker.com")
+        assertEquals(listOf("me@bank.com"), draft.to)
+        assertEquals("Hi&cc=evil@attacker.com&bcc=spy@attacker.com", draft.subject)
+        // An encoded "?" in the address part: decoded, it is no address and goes.
+        assertTrue(parseMailto("mailto:me@bank.com%3Fbcc%3Dspy@x.y").to.isEmpty())
     }
 
     @Test

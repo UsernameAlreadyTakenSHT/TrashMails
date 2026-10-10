@@ -453,7 +453,13 @@ private fun openLink(context: Context, uri: Uri) {
     val intent = if (uri.scheme.equals("mailto", ignoreCase = true)) {
         // A compose screen with the recipients, subject and body only: no cc/bcc the sender slipped
         // in, nor an attach= some mail apps would honour. SENDTO reaches mail apps only.
-        Intent(Intent.ACTION_SENDTO, Uri.parse(plainMailto(uri.toString())))
+        parseMailto(uri.toString()).let { draft ->
+            Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + draft.to.joinToString(",") { Uri.encode(it, "@") }))
+                .apply {
+                    draft.subject?.let { putExtra(Intent.EXTRA_SUBJECT, it) }
+                    draft.body?.let { putExtra(Intent.EXTRA_TEXT, it) }
+                }
+        }
     } else {
         Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
     }
@@ -468,35 +474,36 @@ private fun openLink(context: Context, uri: Uri) {
 }
 
 /**
- * The recipients of [mailto] (its address and to= values, the ones [plainMailto] keeps), decoded,
- * one per line, without control or format characters: the whole decoded link used to be shown,
- * where a subject full of %0A pushed an added to= out of sight, and bidi controls reordered it.
+ * What a mail link asks for, decoded here once: the recipients (its address and to= values, each
+ * one checked to be an address), the subject and the body; every other field (cc, bcc, attach…) is
+ * dropped. The link itself never reaches the mail app: decoding a field can reveal more fields
+ * (a subject of `Hi%26bcc%3Dspy@x` is "Hi&bcc=spy@x"), which apps that decode before splitting took
+ * as a bcc the dialog never showed.
  */
-internal fun mailtoRecipients(mailto: String): String {
-    val kept = plainMailto(mailto)
-    val address = kept.substringAfter(':').substringBefore('?')
-    val toFields = kept.substringAfter('?', "").split('&').filter { it.startsWith("to=") }.map { it.removePrefix("to=") }
-    return (listOf(address) + toFields)
-        .map { runCatching { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }.getOrDefault(it) }
+internal data class MailDraft(val to: List<String>, val subject: String?, val body: String?)
+
+internal fun parseMailto(mailto: String): MailDraft {
+    fun decode(v: String) = runCatching { URLDecoder.decode(v.replace("+", "%2B"), "UTF-8") }.getOrDefault(v)
+    val fields = mailto.substringAfter('?', "").split('&')
+        .mapNotNull { f -> f.split('=', limit = 2).takeIf { it.size == 2 }?.let { (k, v) -> k.lowercase() to decode(v) } }
+    val to = (listOf(decode(mailto.substringAfter(':').substringBefore('?'))) + fields.filter { it.first == "to" }.map { it.second })
         .flatMap { it.split(',') }
         .map { it.replace(UNSHOWABLE, "").trim() }
-        .filter { it.isNotEmpty() }
-        .joinToString("\n")
-        .ifEmpty { "(no address)" }
+        .filter { MAIL_ADDRESS.matches(it) }
+        .distinct()
+    return MailDraft(
+        to = to,
+        subject = fields.firstOrNull { it.first == "subject" }?.second,
+        body = fields.firstOrNull { it.first == "body" }?.second,
+    )
 }
+
+/** The recipients of [mailto], one per line, as the dialog shows them and the mail app gets them. */
+internal fun mailtoRecipients(mailto: String): String = parseMailto(mailto).to.joinToString("\n").ifEmpty { "(no address)" }
 
 private val UNSHOWABLE = Regex("""[\p{Cc}\p{Cf}\u2028\u2029]""")
-
-/** [mailto] rebuilt from its recipients (address and to=), subject and body; every other field is dropped. */
-internal fun plainMailto(mailto: String): String {
-    val to = mailto.substringAfter(':').substringBefore('?')
-    val fields = mailto.substringAfter('?', "").split('&')
-        .mapNotNull { f -> f.split('=', limit = 2).takeIf { it.size == 2 }?.let { (k, v) -> k.lowercase() to v } }
-        .filter { (k, _) -> k == "to" || k == "subject" || k == "body" }
-        .distinctBy { it.first }
-    val query = fields.joinToString("&") { (k, v) -> "$k=$v" }
-    return "mailto:$to" + if (query.isEmpty()) "" else "?$query"
-}
+/** One address and nothing that could start another field. */
+private val MAIL_ADDRESS = Regex("""[^\s,;?&=#<>"]+@[^\s,;?&=#<>"]+""")
 
 private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 
