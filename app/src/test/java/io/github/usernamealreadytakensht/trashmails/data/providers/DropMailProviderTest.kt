@@ -167,13 +167,13 @@ class DropMailProviderTest {
     @Test
     fun aRejectedToken_isReplacedOnce() = runBlocking {
         val prefs = MemoryPrefs()
-        prefs.put("token" to "af_old", "tokenExpiresAt" to (System.currentTimeMillis() + 3_600_000L).toString())
+        prefs.put("token" to "af_oldtoken1", "tokenExpiresAt" to (System.currentTimeMillis() + 3_600_000L).toString())
         val http = http()
-            .on("/api/graphql/af_old", httpError(403, """{"errors":[{"extensions":{"code":"authentication_error"},"message":"token_expired"}]}"""))
+            .on("/api/graphql/af_oldtoken1", httpError(403, """{"errors":[{"extensions":{"code":"authentication_error"},"message":"token_expired"}]}"""))
             .onBody("introduceSession", body(session))
         provider(http, prefs).createInbox(null, CreateOptions())
         assertEquals(
-            listOf("/api/graphql/af_old", "/api/token/generate", "/api/graphql/af_AQJqqXvgiNBpVVWpR1uUJvxKfflpOF8U79e7uaTZ"),
+            listOf("/api/graphql/af_oldtoken1", "/api/token/generate", "/api/graphql/af_AQJqqXvgiNBpVVWpR1uUJvxKfflpOF8U79e7uaTZ"),
             http.urls().map { it.substringAfter("dropmail.me") },
         )
         assertEquals("af_AQJqqXvgiNBpVVWpR1uUJvxKfflpOF8U79e7uaTZ", prefs.getString("token"))
@@ -183,11 +183,27 @@ class DropMailProviderTest {
     fun aBare403_keepsAFreshToken() = runBlocking {
         val prefs = MemoryPrefs()
         // Handed out ten minutes ago (expires a day after that).
-        prefs.put("token" to "af_old", "tokenExpiresAt" to (System.currentTimeMillis() + 24 * 3_600_000L - 600_000L).toString())
-        val http = http().on("/api/graphql/af_old", httpError(403, "<html>Forbidden</html>"))
+        prefs.put("token" to "af_oldtoken1", "tokenExpiresAt" to (System.currentTimeMillis() + 24 * 3_600_000L - 600_000L).toString())
+        val http = http().on("/api/graphql/af_oldtoken1", httpError(403, "<html>Forbidden</html>"))
         runCatching { provider(http, prefs).createInbox(null, CreateOptions()) }
-        assertEquals(listOf("/api/graphql/af_old"), http.urls().map { it.substringAfter("dropmail.me") })
-        assertEquals("af_old", prefs.getString("token"))
+        assertEquals(listOf("/api/graphql/af_oldtoken1"), http.urls().map { it.substringAfter("dropmail.me") })
+        assertEquals("af_oldtoken1", prefs.getString("token"))
+    }
+
+    @Test
+    fun aDamagedTokenWithAFarExpiry_isReplaced_notWaitedFor() = runBlocking {
+        val box = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$context|$plain"
+            override fun open(stored: String, context: String): String? =
+                if (!stored.startsWith("k2:")) stored
+                else stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v else null }
+        }
+        val prefs = MemoryPrefs()
+        // Sealed for something else (damaged) and "valid" for ten years.
+        prefs.put("token" to "k2:other|af_oldtoken1", "tokenExpiresAt" to (System.currentTimeMillis() + 10 * 365 * 86_400_000L).toString())
+        val http = http().onBody("introduceSession", body(session))
+        DropMailProvider(http, MessageCache(MemoryPrefs()), prefs, box).createInbox(null, CreateOptions())
+        assertEquals("/api/token/generate", http.urls().first().substringAfter("dropmail.me"))
     }
 
     @Test

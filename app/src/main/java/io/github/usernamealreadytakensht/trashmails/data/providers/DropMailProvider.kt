@@ -272,11 +272,16 @@ class DropMailProvider(
             box.seal(stored, TOKEN_CONTEXT).takeIf(KeystoreBox::isCurrent)?.let { prefs.put(KEY_TOKEN to it) }
         }
         val expiresAt = prefs.getString(KEY_TOKEN_EXPIRES)?.toLongOrNull() ?: 0L
-        val valid = expiresAt - System.currentTimeMillis() > TOKEN_MARGIN_MS
-        if (!stored.isNullOrBlank() && valid) return stored
-        // Stored but unreadable (the keystore failing for a moment) while still valid: a new token
-        // would strand every session opened with this one, so the refresh fails and is tried again.
-        if (raw != null && stored == null && valid) {
+        // Valid only within one token lifetime from now: an expiry further out (a clock set ahead
+        // when it was written, or an edited file) is not believed.
+        val left = expiresAt - System.currentTimeMillis()
+        val valid = left > TOKEN_MARGIN_MS && left <= TOKEN_LIFETIME_MS
+        // The stored token is used only if it is one (a file edited to hold anything else is not).
+        if (!stored.isNullOrBlank() && valid && TOKEN_FORMAT.matches(stored)) return stored
+        // Stored but unopenable while the keystore fails, and still valid: a new token would strand
+        // every session opened with this one, so the refresh fails and is tried again. Unopenable
+        // while the keystore works, it is damaged: a new one is requested.
+        if (raw != null && stored == null && valid && !box.works()) {
             throw ProviderException("DropMail.me: the device token cannot be read right now, try again in a moment")
         }
         val json = try {
