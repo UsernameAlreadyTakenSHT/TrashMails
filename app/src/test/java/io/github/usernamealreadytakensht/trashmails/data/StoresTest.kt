@@ -208,6 +208,27 @@ class MessageCacheTest {
     private val long = MailSummary(id = "1", from = "a", subject = "s", date = now, html = "x".repeat(200_000))
 
     @Test
+    fun aKeystoreFailingForAMoment_losesNoKeptMail() {
+        var failing = false
+        val flaky = object : SecretBox {
+            override fun seal(plain: String, context: String) = if (failing) plain else "k2:$context|$plain"
+            override fun open(stored: String, context: String): String? =
+                if (!stored.startsWith("k2:")) stored
+                else if (failing) null
+                else stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v else null }
+        }
+        val store = MemoryPrefs()
+        val sealedCache = MessageCache(SealedPrefs(store, flaky, "messages"))
+        sealedCache.update("k") { listOf(long.copy(id = "m1"), long.copy(id = "m2", date = now - 1)) }
+        // A mail arrives while the keystore fails: the file must not be written over.
+        failing = true
+        assertEquals(listOf("m3"), sealedCache.update("k") { known -> listOf(long.copy(id = "m3", date = now + 1)) + known }.map { it.id })
+        failing = false
+        assertEquals(listOf("m3", "m1", "m2"), sealedCache.load("k").map { it.id })
+        assertNull(store.getString("k pending"))
+    }
+
+    @Test
     fun anOversizedBody_isNotRewrittenAtEveryRefresh() {
         cache.update("k") { listOf(long) }
         cache.update("k") { known -> (listOf(long) + known).distinctBy { it.id } }

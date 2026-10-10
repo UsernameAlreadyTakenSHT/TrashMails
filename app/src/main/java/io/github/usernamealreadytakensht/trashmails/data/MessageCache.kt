@@ -13,8 +13,10 @@ import java.io.File
  * what it fetched and a deletion can run at once (leaving a message screen starts a poll), and
  * neither must undo the other.
  *
- * Nothing here throws: a cache that cannot be read is an empty one, so a damaged or oversized
- * file can never keep the app from starting or an address from being removed.
+ * Nothing here throws: a damaged or oversized file reads as an empty cache, so it can never keep
+ * the app from starting or an address from being removed. A file that cannot be opened *for now*
+ * (the keystore failing for a moment) is another matter: it is never written over; new mail goes
+ * to a separate pending file until it can be merged.
  */
 class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {}) {
     constructor(context: Context) : this(FileStore(File(context.noBackupFilesDir, "messages")), context)
@@ -33,16 +35,24 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
     }
 
     fun load(inboxKey: String): List<MailSummary> = synchronized(lock) {
-        val kept = read(inboxKey).map { it.first }
-        // Expired entries leave the file as soon as they are seen, not at the next change.
-        if (inboxKey in expired) update(inboxKey) { it } else kept
+        val main = read(inboxKey) ?: return read(pendingKey(inboxKey)).orEmpty().map { it.first }
+        // Expired entries leave the file as soon as they are seen, and pending mail joins it as soon
+        // as it can, not at the next change.
+        if (inboxKey in expired || !read(pendingKey(inboxKey)).isNullOrEmpty()) update(inboxKey) { it }
+        else main.map { it.first }
     }
+
+    /** Where new mail waits while the file of [inboxKey] cannot be opened. */
+    private fun pendingKey(inboxKey: String) = "$inboxKey pending"
 
     /** Addresses whose file still holds messages [read] found expired. */
     private val expired = mutableSetOf<String>()
 
-    /** The kept messages of [inboxKey], each with when it was first kept (entries from before 0.5.4 count from now). */
-    private fun read(inboxKey: String): List<Pair<MailSummary, Long>> = try {
+    /**
+     * The kept messages of [inboxKey], each with when it was first kept (entries from before 0.5.4
+     * count from now), or null when the file exists but cannot be opened right now.
+     */
+    private fun read(inboxKey: String): List<Pair<MailSummary, Long>>? = try {
         ready()
         val arr = prefs.getString(inboxKey)?.let { JSONArray(it) }
         val now = System.currentTimeMillis()
@@ -53,6 +63,8 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
             }
             all.filter { (_, kept) -> kept >= now - MAX_AGE_MS }.also { if (it.size < all.size) expired += inboxKey }
         }
+    } catch (e: UnreadableValueException) {
+        null
     } catch (e: Exception) {
         emptyList()
     } catch (e: OutOfMemoryError) {
@@ -69,14 +81,20 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
     fun update(inboxKey: String, change: (List<MailSummary>) -> List<MailSummary>): List<MailSummary> = synchronized(lock) {
         // A reply still in flight when its address was removed must not write it back.
         if (inboxKey in forgotten) return emptyList()
-        val entries = read(inboxKey)
+        val pending = pendingKey(inboxKey)
+        val pendingEntries = read(pending)
+        val main = read(inboxKey)
+        // Unreadable for now: the file is left alone and the change goes to the pending one (or,
+        // if that cannot be opened either, nowhere: what is there must not be written over).
+        val target = if (main != null) inboxKey else if (pendingEntries != null) pending else return change(emptyList())
+        val entries = if (main != null) (main + pendingEntries.orEmpty()).distinctBy { it.first.id } else pendingEntries!!
         val current = entries.map { it.first }
         val keptAt = entries.associate { (m, kept) -> m.id to kept }
         // Bodies bounded before comparing: a fresh one longer than its stored copy would otherwise
         // always differ from it and rewrite the file at every refresh.
         var next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
             .map { m -> m.bounded().copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
-        val purge = expired.remove(inboxKey)
+        val purge = expired.remove(target) or (target == inboxKey && !pendingEntries.isNullOrEmpty())
         if (next != current || purge) {
             val now = System.currentTimeMillis()
             var json = serialize(next, keptAt, now)
@@ -85,7 +103,8 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
                 next = next.dropLast(1)
                 json = serialize(next, keptAt, now)
             }
-            prefs.put(inboxKey to json)
+            prefs.put(target to json)
+            if (target == inboxKey && !pendingEntries.isNullOrEmpty()) prefs.remove(pending)
         }
         next
     }
@@ -109,8 +128,9 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
     fun clear(inboxKey: String, alsoDrop: () -> Unit = {}) {
         synchronized(lock) {
             forgotten += inboxKey
-            runCatching { ready(); prefs.remove(inboxKey) }
-            alsoDrop()
+            runCatching { ready(); prefs.remove(inboxKey, pendingKey(inboxKey)) }
+            // Never thrown out of a removal: a provider's file it cannot load must not keep the address.
+            runCatching { alsoDrop() }
         }
     }
 

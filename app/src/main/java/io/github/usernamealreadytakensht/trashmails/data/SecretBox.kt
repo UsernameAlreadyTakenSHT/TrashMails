@@ -25,6 +25,18 @@ interface SecretBox {
     fun open(stored: String, context: String): String?
 }
 
+/**
+ * True when a value sealed now is really sealed and opens again: the box is usable at this moment.
+ * (A failing keystore seals to the plain value, which would open as itself.)
+ */
+fun SecretBox.works(): Boolean {
+    val sealed = seal("probe", "probe")
+    return (sealed != "probe" || this === PlainBox) && open(sealed, "probe") == "probe"
+}
+
+/** A stored value that may be intact but cannot be opened right now (the keystore failing). */
+class UnreadableValueException(key: String) : Exception("$key cannot be opened right now")
+
 /** No sealing: the JVM tests, and the fallback where the keystore is unusable. */
 object PlainBox : SecretBox {
     override fun seal(plain: String, context: String) = plain
@@ -101,7 +113,10 @@ class SealedPrefs(private val inner: Prefs, private val box: SecretBox, private 
 
     override fun getString(key: String): String? {
         val raw = inner.getString(key) ?: return null
-        val value = box.open(raw, context(key)) ?: return null
+        val value = box.open(raw, context(key))
+            // Unopenable while the box works: the value is damaged, and reads as missing. Unopenable
+            // while the box fails too: it may be fine, and the caller must not write over it.
+            ?: if (box.works()) return null else throw UnreadableValueException(key)
         // Stored before sealing: sealed now (if sealing works) rather than at a next write that
         // may never come for an address that gets no more mail.
         if (!KeystoreBox.isCurrent(raw)) {
