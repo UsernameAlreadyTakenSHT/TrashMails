@@ -382,8 +382,10 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
         onDismissRequest = onDismiss,
         title = { Text(if (uri.scheme.equals("mailto", ignoreCase = true)) "Write to this address?" else "Open this site?") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 5, overflow = TextOverflow.Ellipsis)
+            // Nothing cut, the content scrolls instead: an ellipsis cut the end of a long host (its
+            // real domain, its punycode) or the last recipients, the very things to check.
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(site, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 SelectionContainer {
                     Text(
                         url,
@@ -405,8 +407,8 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
 }
 
 /**
- * A host as the link dialog shows it: a non-ASCII one with its punycode form too, so a look-alike
- * letter cannot pass for the real site. When punycode cannot be computed (java.net.IDN knows only
+ * A host as the link dialog shows it: a non-ASCII one by its punycode form first (what the browser
+ * goes to), then as written, so a look-alike letter cannot pass for the real site. When punycode cannot be computed (java.net.IDN knows only
  * Unicode 3.2: a later character, even an invisible one, made it fail and the bare Unicode host was
  * shown), every non-ASCII character is spelled out as a code point instead.
  */
@@ -414,7 +416,7 @@ internal fun displayHost(host: String): String {
     if (host.all { it.code < 0x80 }) return host
     val ascii = runCatching { IDN.toASCII(host, IDN.ALLOW_UNASSIGNED) }.getOrNull()
         ?: host.codePoints().toArray().joinToString("") { cp -> if (cp < 0x80) cp.toChar().toString() else "\\u{%X}".format(cp) }
-    return if (ascii.equals(host, ignoreCase = true)) host else "$host ($ascii)"
+    return if (ascii.equals(host, ignoreCase = true)) host else "$ascii ($host)"
 }
 
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
