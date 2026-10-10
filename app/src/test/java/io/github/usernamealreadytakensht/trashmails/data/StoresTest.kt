@@ -208,6 +208,16 @@ class MessageCacheTest {
     private val long = MailSummary(id = "1", from = "a", subject = "s", date = now, html = "x".repeat(200_000))
 
     @Test
+    fun anAddressCreatedAgain_isKeptAgain() {
+        cache.clear("k")
+        cache.update("k") { listOf(long) }
+        assertTrue(cache.load("k").isEmpty())
+        cache.revive("k")
+        cache.update("k") { listOf(long) }
+        assertEquals(listOf("1"), cache.load("k").map { it.id })
+    }
+
+    @Test
     fun aKeystoreFailingForAMoment_losesNoKeptMail() {
         var failing = false
         val flaky = object : SecretBox {

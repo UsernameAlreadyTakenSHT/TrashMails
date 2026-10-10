@@ -139,6 +139,14 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         synchronized(lock) { if (inboxKey !in forgotten) block() }
     }
 
+    /**
+     * [inboxKey] is in use again (the same address created anew after it was removed in this run):
+     * what is written for it is kept again.
+     */
+    fun revive(inboxKey: String) {
+        synchronized(lock) { forgotten -= inboxKey }
+    }
+
     /** True once [clear] ran for [inboxKey]: whatever a reply still in flight brings is dropped. */
     fun isForgotten(inboxKey: String): Boolean = synchronized(lock) { inboxKey in forgotten }
 

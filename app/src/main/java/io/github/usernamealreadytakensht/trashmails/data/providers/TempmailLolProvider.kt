@@ -45,6 +45,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
         if (json.optBoolean("captcha_required")) throw ProviderException("tempmail.lol asks for a captcha right now: try again later")
         json.text("error")?.let { throw ProviderException("tempmail.lol: $it") }
         val now = System.currentTimeMillis()
+        // The same address may have been removed earlier in this run: its mail is kept again.
         return Inbox(
             id = checkedAddress(json.getString("address"), provider),
             provider = provider,
@@ -52,7 +53,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
             token = json.getString("token"),
             createdAt = now,
             expiresAt = now + LIFETIME_MS,
-        )
+        ).also { cache.revive(it.key) }
     }
 
     /**

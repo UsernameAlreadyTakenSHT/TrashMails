@@ -89,6 +89,8 @@ class DropMailProvider(
         val address = checkedAddress(first.getString("address"), provider)
         val restoreKey = first.getString("restoreKey")
         val inbox = Inbox(id = address, provider = provider, address = address, token = restoreKey)
+        // The same address may have been removed earlier in this run: its session is kept again.
+        cache.revive(inbox.key)
         saveSession(inbox, session.getString("id"), restoreKey)
         return inbox
     }
