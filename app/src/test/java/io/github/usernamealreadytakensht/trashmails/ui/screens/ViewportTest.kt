@@ -66,6 +66,14 @@ class ViewportTest {
     }
 
     @Test
+    fun displayHost_neverRewritesASharpSOrAFinalSigma() {
+        // IDNA 2003 turns them into "ss" and a plain sigma; the browser keeps them (another domain).
+        assertEquals("www.sparka\\u{DF}e.de (www.sparka\u00DFe.de)", displayHost("www.sparka\u00DFe.de"))
+        val greek = "\u03B1\u03C2.gr"
+        assertTrue(displayHost(greek).startsWith("\\u{3B1}\\u{3C2}.gr"))
+    }
+
+    @Test
     fun privacyMeta_comesFirst_withThePolicyOnlyWhileBlocked() {
         val blocked = withPrivacyMeta("<head><title>t</title></head>", blockRemote = true)
         assertTrue(blocked.startsWith("<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta http-equiv=\"Content-Security-Policy\""))

@@ -406,13 +406,21 @@ private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDi
  * goes to), then as written, so a look-alike letter cannot pass for the real site. When punycode cannot be computed (java.net.IDN knows only
  * Unicode 3.2: a later character, even an invisible one, made it fail and the bare Unicode host was
  * shown), every non-ASCII character is spelled out as a code point instead.
+ *
+ * So too when the host holds a character java.net.IDN (IDNA 2003) rewrites but browsers (UTS #46,
+ * non-transitional) keep: "sparka\u00DFe.de" would read "sparkasse.de", the real bank, while the
+ * browser goes to the punycode of the name with the \u00DF.
  */
 internal fun displayHost(host: String): String {
     if (host.all { it.code < 0x80 }) return host
-    val ascii = runCatching { IDN.toASCII(host, IDN.ALLOW_UNASSIGNED) }.getOrNull()
+    val ascii = host.takeIf { h -> h.none { it in IDNA_DEVIATIONS } }
+        ?.let { runCatching { IDN.toASCII(it, IDN.ALLOW_UNASSIGNED) }.getOrNull() }
         ?: host.codePoints().toArray().joinToString("") { cp -> if (cp < 0x80) cp.toChar().toString() else "\\u{%X}".format(cp) }
     return if (ascii.equals(host, ignoreCase = true)) host else "$ascii ($host)"
 }
+
+/** Sharp s, final sigma, ZWNJ and ZWJ: mapped away by IDNA 2003, kept by today's browsers. */
+private const val IDNA_DEVIATIONS = "\u00DF\u03C2\u200C\u200D"
 
 /** http(s) and mailto only: the sender must not be able to fire intent://, tel: or another app's deep link. */
 private fun isAllowedLink(uri: Uri): Boolean = uri.scheme?.lowercase() in setOf("http", "https", "mailto")
