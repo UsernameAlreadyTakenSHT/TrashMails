@@ -7,6 +7,8 @@
          <!-- Sources and docs the IDE fetches for display: never on the build's classpath. -->
          <trust file=".*-javadoc[.]jar" regex="true"/>
          <trust file=".*-sources[.]jar" regex="true"/>
+         <!-- Gradle's own sources, fetched by Android Studio's sync for navigation in build scripts. -->
+         <trust group="gradle" name="gradle" file="gradle-.*-src[.]zip" regex="true"/>
       </trusted-artifacts>
    </configuration>
    <components>
