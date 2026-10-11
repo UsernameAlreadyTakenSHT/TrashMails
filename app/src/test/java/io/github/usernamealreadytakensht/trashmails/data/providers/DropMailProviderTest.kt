@@ -8,6 +8,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.SecretBox
+import io.github.usernamealreadytakensht.trashmails.data.UnreadableValueException
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.body
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.fixture
 import io.github.usernamealreadytakensht.trashmails.data.providers.FakeHttp.Companion.httpError
@@ -204,6 +205,27 @@ class DropMailProviderTest {
         val http = http().onBody("introduceSession", body(session))
         DropMailProvider(http, MessageCache(MemoryPrefs()), prefs, box).createInbox(null, CreateOptions())
         assertEquals("/api/token/generate", http.urls().first().substringAfter("dropmail.me"))
+    }
+
+    @Test
+    fun aTokenUnreadableForAMoment_isNotReplaced_evenIfTheProbeThenWorks() = runBlocking {
+        // Opening the token fails (the keystore busy), the probe right after succeeds.
+        val box = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$context|$plain"
+            override fun open(stored: String, context: String): String? {
+                if (context != "probe") throw UnreadableValueException(context)
+                return stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v else null }
+            }
+        }
+        val prefs = MemoryPrefs()
+        val sealed = "k2:dropmail-device-token|af_oldtoken1"
+        prefs.put("token" to sealed, "tokenExpiresAt" to (System.currentTimeMillis() + 3_600_000L).toString())
+        val http = http().onBody("introduceSession", body(session))
+        assertThrows(ProviderException::class.java) {
+            runBlocking { DropMailProvider(http, MessageCache(MemoryPrefs()), prefs, box).createInbox(null, CreateOptions()) }
+        }
+        assertTrue(http.calls.isEmpty())
+        assertEquals(sealed, prefs.getString("token"))
     }
 
     @Test

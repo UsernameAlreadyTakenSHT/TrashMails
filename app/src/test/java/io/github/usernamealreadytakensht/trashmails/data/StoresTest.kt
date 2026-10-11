@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails.data
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -82,6 +83,27 @@ class InboxStoreTest {
         store.save(loaded + Inbox("b", Provider.MAILDROP, "b@maildrop.cc", createdAt = 2L))
         failing = false
         assertEquals("pw", InboxStore(prefs, flaky).load().first { it.id == "a" }.token)
+    }
+
+    @Test
+    fun aTokenUnreadableForNow_leavesTheListLoaded_andIsWrittenBackAsItWas() {
+        InboxStore(prefs, reversing).save(listOf(
+            Inbox("a", Provider.MAIL_TM, "a@mail.tm", token = "pw", createdAt = 1L),
+            Inbox("b", Provider.MAILDROP, "b@maildrop.cc", createdAt = 2L),
+        ))
+        var failing = true
+        val unreadable = object : SecretBox {
+            override fun seal(plain: String, context: String) = reversing.seal(plain, context)
+            override fun open(stored: String, context: String) =
+                if (failing) throw UnreadableValueException(context) else reversing.open(stored, context)
+        }
+        val store = InboxStore(prefs, unreadable)
+        val loaded = store.load()
+        assertEquals(listOf("a", "b"), loaded.map { it.id })
+        assertNull(loaded.first().token)
+        store.save(loaded)
+        failing = false
+        assertEquals("pw", InboxStore(prefs, unreadable).load().first().token)
     }
 
     @Test
@@ -239,6 +261,26 @@ class MessageCacheTest {
     }
 
     @Test
+    fun aKeystoreBlip_isNotTakenForDamage() {
+        // Opening fails once, and the probe that follows succeeds: the file must still be left alone.
+        var blips = 0
+        val blipping = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$context|$plain"
+            override fun open(stored: String, context: String): String? {
+                if (stored.startsWith("k2:") && context != "probe" && blips-- > 0) throw UnreadableValueException(context)
+                return if (!stored.startsWith("k2:")) stored
+                else stored.removePrefix("k2:").split("|", limit = 2).let { (c, v) -> if (c == context) v else null }
+            }
+        }
+        val store = MemoryPrefs()
+        val sealedCache = MessageCache(SealedPrefs(store, blipping, "messages"))
+        sealedCache.update("k") { listOf(long.copy(id = "m1")) }
+        blips = 1
+        sealedCache.update("k") { known -> listOf(long.copy(id = "m2", date = now + 1)) + known }
+        assertEquals(listOf("m2", "m1"), sealedCache.load("k").map { it.id })
+    }
+
+    @Test
     fun anOversizedBody_isNotRewrittenAtEveryRefresh() {
         cache.update("k") { listOf(long) }
         cache.update("k") { known -> (listOf(long) + known).distinctBy { it.id } }
@@ -322,5 +364,28 @@ class FileStoreTest {
         assertEquals(1, dir.listFiles()!!.size)
         store.put("dropmail:c@d" to "z")
         assertEquals("z", store.getString("dropmail:c@d"))
+    }
+}
+
+class OpenSealedTest {
+    @Test
+    fun damageReadsAsNull_aFailingKeystoreThrows() {
+        assertEquals("v", openSealed("c") { "v" })
+        assertNull(openSealed("c") { throw javax.crypto.AEADBadTagException("tag") })
+        assertNull(openSealed("c") { throw IllegalArgumentException("bad base64") })
+        assertThrows(UnreadableValueException::class.java) { openSealed("c") { throw java.security.ProviderException("keystore busy") } }
+        assertThrows(UnreadableValueException::class.java) { openSealed("c") { throw IllegalStateException("binder died") } }
+    }
+
+    @Test
+    fun aBoxThatThrowsDoesNotWork() {
+        val throwing = object : SecretBox {
+            override fun seal(plain: String, context: String) = "k2:$plain"
+            override fun open(stored: String, context: String): String? = throw UnreadableValueException(context)
+        }
+        assertFalse(throwing.works())
+        var told = false
+        assertNull(throwing.openOrUnreadable("k2:x", "c") { told = true })
+        assertTrue(told)
     }
 }

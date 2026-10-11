@@ -14,6 +14,7 @@ import io.github.usernamealreadytakensht.trashmails.data.PlainBox
 import io.github.usernamealreadytakensht.trashmails.data.Prefs
 import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
 import io.github.usernamealreadytakensht.trashmails.data.SecretBox
+import io.github.usernamealreadytakensht.trashmails.data.openOrUnreadable
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
@@ -281,7 +282,8 @@ class DropMailProvider(
     /** The device's `af_` token, requested when there is none or it is about to run out. */
     private suspend fun token(): String {
         val raw = prefs.getString(KEY_TOKEN)?.takeIf { it.isNotBlank() }
-        val stored = raw?.let { box.open(it, TOKEN_CONTEXT) }
+        var unreadable = false
+        val stored = raw?.let { box.openOrUnreadable(it, TOKEN_CONTEXT) { unreadable = true } }
         // A token stored in clear or in the older format is sealed again the first time it is read,
         // if sealing works right now.
         if (stored != null && !KeystoreBox.isCurrent(raw)) {
@@ -297,7 +299,7 @@ class DropMailProvider(
         // Stored but unopenable while the keystore fails, and still valid: a new token would strand
         // every session opened with this one, so the refresh fails and is tried again. Unopenable
         // while the keystore works, it is damaged: a new one is requested.
-        if (raw != null && stored == null && valid && !box.works()) {
+        if (raw != null && stored == null && valid && (unreadable || !box.works())) {
             throw ProviderException("DropMail.me: the device token cannot be read right now, try again in a moment")
         }
         val json = try {
@@ -332,10 +334,11 @@ class DropMailProvider(
     private fun loadSession(inbox: Inbox): Pair<String?, String> {
         val o = prefs.getString(sessionKey(inbox))?.let { runCatching { JSONObject(it) }.getOrNull() }
         val raw = o?.optString("restoreKey")?.takeIf { it.isNotBlank() }
-        val opened = raw?.let { box.open(it, restoreContext(inbox)) }
+        var unreadable = false
+        val opened = raw?.let { box.openOrUnreadable(it, restoreContext(inbox)) { unreadable = true } }
         // Stored but unopenable while the keystore fails: it may be the only valid key, so the
         // refresh fails and is retried. The address's first key is only a fallback for a damaged one.
-        if (raw != null && opened == null && !box.works()) {
+        if (raw != null && opened == null && (unreadable || !box.works())) {
             throw ProviderException("DropMail.me: the restore key cannot be read right now, try again in a moment")
         }
         val restoreKey = opened ?: inbox.token ?: throw ProviderException("Missing restore key")

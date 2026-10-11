@@ -4,6 +4,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import java.util.Base64
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -21,7 +22,11 @@ interface SecretBox {
      * for that context only, so sealed values swapped between entries in the files do not open.
      */
     fun seal(plain: String, context: String): String
-    /** The secret, or null when it cannot be opened. A value stored before sealing existed comes back as is. */
+    /**
+     * The secret, or null when it is damaged (or sealed for another context). A value stored before
+     * sealing existed comes back as is. Throws [UnreadableValueException] when it cannot be told
+     * right now (the keystore failing): the value may be intact, and must not be written over.
+     */
     fun open(stored: String, context: String): String?
 }
 
@@ -31,11 +36,40 @@ interface SecretBox {
  */
 fun SecretBox.works(): Boolean {
     val sealed = seal("probe", "probe")
-    return (sealed != "probe" || this === PlainBox) && open(sealed, "probe") == "probe"
+    return (sealed != "probe" || this === PlainBox) && openOrUnreadable(sealed, "probe") == "probe"
 }
 
 /** A stored value that may be intact but cannot be opened right now (the keystore failing). */
 class UnreadableValueException(key: String) : Exception("$key cannot be opened right now")
+
+/**
+ * [SecretBox.open], with a value that cannot be told right now ([UnreadableValueException])
+ * reported through [onUnreadable] and read as null: for callers that go on without it but must
+ * not take it for damaged.
+ */
+fun SecretBox.openOrUnreadable(stored: String, context: String, onUnreadable: () -> Unit = {}): String? =
+    try {
+        open(stored, context)
+    } catch (e: UnreadableValueException) {
+        onUnreadable()
+        null
+    }
+
+/**
+ * Runs [decrypt] and tells a damaged value (null: a failed GCM tag, bad Base64 or a wrong length,
+ * which no retry will change) from a failure of the keystore itself (any other exception, thrown
+ * as [UnreadableValueException]: the value may be intact).
+ */
+internal inline fun openSealed(context: String, decrypt: () -> String): String? =
+    try {
+        decrypt()
+    } catch (e: AEADBadTagException) {
+        null
+    } catch (e: IllegalArgumentException) {
+        null
+    } catch (e: Exception) {
+        throw UnreadableValueException(context)
+    }
 
 /** No sealing: the JVM tests, and the fallback where the keystore is unusable. */
 object PlainBox : SecretBox {
@@ -78,13 +112,15 @@ object KeystoreBox : SecretBox {
     override fun open(stored: String, context: String): String? {
         val legacy = stored.startsWith(LEGACY_PREFIX)
         if (!legacy && !stored.startsWith(PREFIX)) return stored
-        return runCatching {
+        // A damaged value reads as null; a keystore failing for a moment throws, rather than passing
+        // for damage (which let callers replace the value) when the next probe happens to succeed.
+        return openSealed(context) {
             val bytes = Base64.getDecoder().decode(stored.substring(PREFIX.length))
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes, 0, IV_BYTES))
             if (!legacy) cipher.updateAAD(context.toByteArray())
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES))
-        }.getOrNull()
+        }
     }
 
     /** Sealed in either format. */

@@ -52,7 +52,7 @@ class InboxStore(private val prefs: Prefs, private val box: SecretBox = PlainBox
         val stored = o.optString("token").takeIf { it.isNotBlank() && provider != Provider.GUERRILLA_MAIL }
         // A token that cannot be opened leaves this address without access for now, not the list;
         // its sealed value is kept to be written back (see [unopened]).
-        val token = stored?.let { box.open(it, tokenContext("${provider.name}:${o.getString("id")}")) }
+        val token = stored?.let { box.openOrUnreadable(it, tokenContext("${provider.name}:${o.getString("id")}")) }
         val inbox = Inbox(
             id = o.getString("id"),
             provider = provider,
