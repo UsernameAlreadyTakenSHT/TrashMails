@@ -20,6 +20,7 @@ import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import io.github.usernamealreadytakensht.trashmails.data.works
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -80,7 +81,17 @@ class DropMailProvider(
     private var domainIds: Map<String, String>? = null
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
+        creating.incrementAndGet()
         noAddressLeft = false
+        try {
+            return introduceInbox(options).also { forgetAfterCreation = false }
+        } finally {
+            // The last address went while this was in flight, and nothing was created: the token goes now.
+            if (creating.decrementAndGet() == 0 && forgetAfterCreation) forgetAll()
+        }
+    }
+
+    private suspend fun introduceInbox(options: CreateOptions): Inbox {
         val domainId = options.domain?.takeIf { it in provider.domains }?.let { domainId(it) }
         // Left to the server, the pick stays among the permanent domains (the ones the dialog lists).
         val input = if (domainId != null) "domainId: ${quote(domainId)}" else "permanentDomainOnly: true"
@@ -175,6 +186,14 @@ class DropMailProvider(
      * otherwise list its sessions, and so the restore keys of addresses already removed.
      */
     override fun forgetAll() {
+        // A creation in flight brings an address, made with this token: it is kept, and goes only
+        // if that creation fails (otherwise the new address's session would be lost with it, and
+        // the token never stored again until a restart).
+        if (creating.get() > 0) {
+            forgetAfterCreation = true
+            return
+        }
+        forgetAfterCreation = false
         noAddressLeft = true
         prefs.remove(KEY_TOKEN, KEY_TOKEN_EXPIRES)
     }
@@ -184,6 +203,10 @@ class DropMailProvider(
      * must not write the device token back (it went with the last address).
      */
     @Volatile private var noAddressLeft = false
+
+    /** Creations in flight, and whether the last address went meanwhile (see [forgetAll]). */
+    private val creating = AtomicInteger()
+    @Volatile private var forgetAfterCreation = false
 
     private fun putToken(vararg entries: Pair<String, Any>) {
         if (!noAddressLeft) prefs.put(*entries)

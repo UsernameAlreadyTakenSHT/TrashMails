@@ -208,6 +208,30 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun theLastAddressRemovedDuringACreation_keepsTheTokenOfTheNewOne() = runBlocking {
+        val prefs = MemoryPrefs()
+        lateinit var p: DropMailProvider
+        // The last address goes (the forget-after-hours sweep) while the creation is in flight.
+        val http = http().onBody("introduceSession", { p.forgetAll(); session })
+        p = provider(http, prefs)
+        p.createInbox(null, CreateOptions())
+        assertEquals("af_AQJqqXvgiNBpVVWpR1uUJvxKfflpOF8U79e7uaTZ", prefs.getString("token"))
+        // Still used afterwards, not asked for again at every call.
+        p.createInbox(null, CreateOptions())
+        assertEquals(1, http.urls().count { it.contains("/api/token/generate") })
+    }
+
+    @Test
+    fun theLastAddressRemovedDuringAFailedCreation_takesTheTokenWithIt() = runBlocking {
+        val prefs = MemoryPrefs()
+        lateinit var p: DropMailProvider
+        val http = http().onBody("introduceSession", { p.forgetAll(); throw ProviderException("down") })
+        p = provider(http, prefs)
+        runCatching { p.createInbox(null, CreateOptions()) }
+        assertNull(prefs.getString("token"))
+    }
+
+    @Test
     fun aTokenUnreadableForAMoment_isNotReplaced_evenIfTheProbeThenWorks() = runBlocking {
         // Opening the token fails (the keystore busy), the probe right after succeeds.
         val box = object : SecretBox {
