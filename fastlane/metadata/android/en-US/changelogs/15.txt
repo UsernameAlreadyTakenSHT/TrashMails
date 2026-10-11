@@ -1,0 +1,5 @@
+Security review fixes:
+- A brief keystore error no longer erases kept emails or the DropMail.me token
+- DropMail.me: an address created while the last one is removed keeps working
+- Link dialog: hosts with a sharp s or final sigma can no longer pass for another site
+- Gradle 9.8.1

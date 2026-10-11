@@ -1,3 +1,15 @@
+## v0.5.10 — 2026-10-11
+
+A last security review, of 0.5.9, and the fixes for the three small issues it found.
+
+### Fixed
+- **A keystore failing for a moment is no longer taken for a damaged value**: only a failed check of the sealed data, or malformed data, counts as damage now. Before, a keystore error followed by a working probe let the kept emails of an address be written over, or the DropMail.me device token be replaced (stranding its sessions).
+- **DropMail.me: the last address removed while another was being created** (the forget-after-hours sweep) no longer leaves the new address without a stored token until the app restarts; if the creation fails, the token still goes.
+- **Link dialog**: a host with a sharp s or a final sigma is spelled out by code points instead of reading as "ss" or a plain sigma: `sparkaße.de` no longer passes for `sparkasse.de`, which is another domain.
+
+### Changed
+- **Gradle 9.8.1**, its checksum pinned; the sources zip Android Studio fetches for build scripts passes dependency verification.
+
 ## v0.5.9 — 2026-10-10
 
 0.5.8 again, with its APK: the repository's releases became immutable just before 0.5.8 was published, which froze that release before the APK could be attached. No change in the app; see 0.5.8 below for what it brings.
