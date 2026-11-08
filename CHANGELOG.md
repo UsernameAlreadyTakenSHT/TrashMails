@@ -1,3 +1,13 @@
+## v0.5.11 — 2026-11-08
+
+Maintenance: the build tools, the libraries and the CI move to their current releases. No change in what the app does.
+
+### Changed
+- **Gradle 9.9.0** and **Android Gradle Plugin 9.5.1**, the wrapper's checksum pinned.
+- **Libraries**: Compose BOM 2026.09.00, kotlinx-coroutines 1.11.0, OkHttp 5.5.1, org.json 20260814.
+- **Dependency verification rebuilt from scratch**, so the entries for versions no longer used are gone.
+- **CI actions**: gradle/actions 6.4.1, setup-java 6.2.0, upload-artifact 7.0.2, still pinned to commit SHAs.
+
 ## v0.5.10 — 2026-10-11
 
 A last security review, of 0.5.9, and the fixes for the three small issues it found.
