@@ -3,6 +3,7 @@ package io.github.usernamealreadytakensht.trashmails.data
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,6 +31,27 @@ class NameHelpersTest {
         assertNull(sanitizeName(""))
         assertNull(sanitizeName("..."))
         assertNull(sanitizeName("@example.com"))
+    }
+
+    @Test
+    fun checkedName_refusesWhatTheServiceWouldNot() {
+        // Counted once cleaned: "a b!" is "ab", two characters.
+        val e = assertThrows(ProviderException::class.java) { checkedName("a b!", Provider.INBOX_KITTEN) }
+        assertEquals("Inbox Kitten needs a name of 3 characters at least", e.message)
+        assertEquals("abc", checkedName("abc", Provider.INBOX_KITTEN))
+        assertEquals("ab", checkedName("ab", Provider.MAILDROP))
+    }
+
+    @Test
+    fun checkedName_refusesALocalPartOverSixtyFourCharacters_forEveryProvider() {
+        assertEquals("a".repeat(64), checkedName("a".repeat(64), Provider.MAIL_TM))
+        Provider.entries.forEach { p -> assertThrows(ProviderException::class.java) { checkedName("a".repeat(65), p) } }
+    }
+
+    @Test
+    fun checkedName_leavesAnEmptyNameToTheRandomOne() {
+        assertNull(checkedName("  ", Provider.INBOX_KITTEN))
+        assertNull(checkedName(null, Provider.INBOX_KITTEN))
     }
 
     @Test

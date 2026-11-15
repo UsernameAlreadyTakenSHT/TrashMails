@@ -11,7 +11,7 @@ import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.queryParam
 import io.github.usernamealreadytakensht.trashmails.data.randomName
-import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.checkedName
 import io.github.usernamealreadytakensht.trashmails.data.secondsToMillis
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
@@ -30,7 +30,7 @@ class InboxKittenProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
-        val n = sanitizeName(name) ?: randomName()
+        val n = checkedName(name, provider) ?: randomName()
         return Inbox(id = n, provider = provider, address = "$n@$DOMAIN")
     }
 

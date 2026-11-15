@@ -11,7 +11,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MessageCache
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.queryParam
-import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.checkedName
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import kotlinx.coroutines.NonCancellable
@@ -35,7 +35,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
         val body = JSONObject()
-        sanitizeName(name)?.let { body.put("prefix", it) }
+        checkedName(name, provider)?.let { body.put("prefix", it) }
         if (options.noSubdomain) body.put("subdomain", false)
         val json = try {
             JSONObject(http.postJson("$BASE/inbox/create", body.toString()))

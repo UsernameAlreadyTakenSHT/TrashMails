@@ -13,7 +13,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
-import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.checkedName
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONObject
@@ -81,7 +81,7 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
      * Guerrilla Mail domain delivers to the same inbox, the API always answers with its own.
      */
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
-        val requested = sanitizeName(name) ?: randomName()
+        val requested = checkedName(name, provider) ?: randomName()
         val json = attach(requested)
         // The inbox is the name the server settled on, should it differ from the one asked for:
         // every later listing is checked against it.

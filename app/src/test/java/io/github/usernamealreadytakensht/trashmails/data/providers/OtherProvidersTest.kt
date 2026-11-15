@@ -40,6 +40,13 @@ class InboxKittenProviderTest {
         assertEquals("<p>hello</p>", content.html)
         assertTrue(http.urls().single().endsWith("/mail/getHtml?key=key+one&region=eu"))
     }
+
+    @Test
+    fun createInbox_refusesANameTheApiWouldNot_withoutARequest() {
+        val http = FakeHttp()
+        assertThrows(ProviderException::class.java) { runBlocking { InboxKittenProvider(http).createInbox("ab") } }
+        assertTrue(http.calls.isEmpty())
+    }
 }
 
 class MaildropProviderTest {

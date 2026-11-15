@@ -11,7 +11,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MimeText
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
-import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.checkedName
 import io.github.usernamealreadytakensht.trashmails.data.parseIsoDate
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
@@ -38,7 +38,7 @@ class MaildropProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
-        val n = sanitizeName(name) ?: randomName()
+        val n = checkedName(name, provider) ?: randomName()
         return Inbox(id = n, provider = provider, address = "$n@$DOMAIN")
     }
 

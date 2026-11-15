@@ -14,7 +14,7 @@ import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.randomName
-import io.github.usernamealreadytakensht.trashmails.data.sanitizeName
+import io.github.usernamealreadytakensht.trashmails.data.checkedName
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import org.json.JSONArray
@@ -81,7 +81,7 @@ class MailTmProvider(private val http: HttpApi = Http) : MailProvider {
     }
 
     override suspend fun createInbox(name: String?, options: CreateOptions): Inbox {
-        val local = sanitizeName(name) ?: randomName()
+        val local = checkedName(name, provider) ?: randomName()
         val address = "$local@${activeDomain()}"
         val password = randomName(24)
         val body = JSONObject().put("address", address).put("password", password).toString()

@@ -24,9 +24,15 @@ enum class Provider(
     val randomDomain: Boolean = false,
     /** Any `local-tag@sub.domain` (tag and sub made of letters) is delivered to `local@domain`. */
     val extendedAddresses: Boolean = false,
+    /** Shortest name the service takes ([checkedName] refuses a shorter one before any request). */
+    val minNameLength: Int = 1,
 ) {
     // Declaration order is the display order within a group (open source first, unavailable last).
-    INBOX_KITTEN("Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten"),
+    INBOX_KITTEN(
+        "Inbox Kitten", "@inboxkitten.com", true, 20, "https://inboxkitten.com", sourceUrl = "https://github.com/uilicious/inboxkitten",
+        // Its list API answers 400 "Invalid email" to a name of one or two characters (checked November 2026).
+        minNameLength = 3,
+    ),
     MAILDROP("Maildrop", "@maildrop.cc", true, 20, "https://maildrop.cc", "https://maildrop.cc/privacy/", sourceUrl = "https://github.com/m242/maildrop"),
     // Guerrilla Mail has no separate policy page: the privacy section lives in its terms.
     GUERRILLA_MAIL(

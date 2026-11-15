@@ -101,6 +101,23 @@ fun sanitizeName(raw: String?): String? =
         ?.trim('.')
         ?.takeIf { it.isNotBlank() }
 
+/** Longest name accepted: an address's local part has 64 characters at most (RFC 5321), and senders refuse a longer one. */
+const val MAX_NAME_CHARS = 64
+
+/**
+ * [raw] cleaned by [sanitizeName], or null when nothing is left (the provider then picks a random
+ * name). A name [provider] would refuse is refused here, before any request: an Inbox Kitten name
+ * of two letters was created locally, took a slot of the quota, then failed at every refresh.
+ */
+fun checkedName(raw: String?, provider: Provider): String? {
+    val name = sanitizeName(raw) ?: return null
+    if (name.length < provider.minNameLength) {
+        throw ProviderException("${provider.label} needs a name of ${provider.minNameLength} characters at least")
+    }
+    if (name.length > MAX_NAME_CHARS) throw ProviderException("A name has $MAX_NAME_CHARS characters at most")
+    return name
+}
+
 /** [value] as one URL query parameter value (form encoding: a space is `+`). */
 fun queryParam(value: String): String = URLEncoder.encode(value, "UTF-8")
 
