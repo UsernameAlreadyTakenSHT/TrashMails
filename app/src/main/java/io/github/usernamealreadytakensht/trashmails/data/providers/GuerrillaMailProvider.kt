@@ -94,8 +94,8 @@ class GuerrillaMailProvider(private val http: HttpApi = Http) : MailProvider {
             address = checkedAddress("$local@$domain", provider),
             // The session token is cached in memory only: it expires within the hour and is not a secret worth keeping.
             token = null,
-            createdAt = secondsToMillis(json.optLong("email_timestamp"))
-                ?: System.currentTimeMillis(),
+            // createdAt is left to the app's own clock, not the server's email_timestamp: "forget
+            // old addresses" counts from it, and a stale server time would drop the address at once.
         )
     }
 

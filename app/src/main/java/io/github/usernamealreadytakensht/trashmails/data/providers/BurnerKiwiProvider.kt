@@ -47,7 +47,7 @@ class BurnerKiwiProvider(private val http: HttpApi = Http) : MailProvider {
             provider = provider,
             address = checkedAddress(email.getString("address"), provider),
             token = result.getString("token"),
-            createdAt = secondsToMillis(email.optLong("created_at")) ?: System.currentTimeMillis(),
+            // createdAt is left to the app's clock: "forget old addresses" counts from it (see Guerrilla Mail).
             expiresAt = secondsToMillis(email.optLong("ttl")),
         )
     }

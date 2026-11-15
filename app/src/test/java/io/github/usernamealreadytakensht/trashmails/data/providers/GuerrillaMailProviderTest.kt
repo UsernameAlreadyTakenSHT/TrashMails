@@ -23,6 +23,7 @@ class GuerrillaMailProviderTest {
     @Test
     fun createInbox_usesTheSessionReply() = runBlocking {
         val http = FakeHttp().on("f=set_email_user", fixture("guerrilla_set_email_user"))
+        val before = System.currentTimeMillis()
         val created = GuerrillaMailProvider(http).createInbox("Trash Mails Probe!")
 
         assertEquals("trashmailsprobe", created.id)
@@ -30,7 +31,8 @@ class GuerrillaMailProviderTest {
         assertEquals("trashmailsprobe@guerrillamail.com", created.address)
         // The session token stays in memory; nothing secret-looking is persisted for a public inbox.
         assertNull(created.token)
-        assertEquals(1_789_415_079_000L, created.createdAt)
+        // The app's clock, not the fixture's email_timestamp (September 2026): forgetting counts from it.
+        assertTrue(created.createdAt >= before)
         assertTrue(http.urls().single().contains("email_user=trashmailsprobe"))
     }
 

@@ -89,12 +89,14 @@ class MaildropProviderTest {
 class BurnerKiwiProviderTest {
     @Test
     fun createInbox_readsAddressTokenAndTtl() = runBlocking {
+        val before = System.currentTimeMillis()
         val created = BurnerKiwiProvider(FakeHttp().on("/api/v2/inbox", fixture("burner_create"))).createInbox(null)
 
         assertEquals("7c1c0d2e-1111-4222-8333-944455556666", created.id)
         assertEquals("cheerful-otter@deceit.pro", created.address)
         assertEquals("eyJfixture", created.token)
-        assertEquals(1_789_415_000_000L, created.createdAt)
+        // The app's clock, not the server's created_at.
+        assertTrue(created.createdAt >= before)
         assertEquals(1_789_501_400_000L, created.expiresAt)
     }
 
