@@ -93,14 +93,22 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         // Bodies bounded before comparing: a fresh one longer than its stored copy would otherwise
         // always differ from it and rewrite the file at every refresh.
         var next = change(current).sortedByDescending { it.date }.take(MAX_MESSAGES)
-            .map { m -> m.bounded().copy(html = m.html?.take(MAX_BODY_CHARS), text = m.text?.take(MAX_BODY_CHARS)) }
+            .map { m -> m.bounded().withBodiesWithin(MAX_BODY_CHARS) }
         val purge = expired.remove(target) or (target == inboxKey && !pendingEntries.isNullOrEmpty())
         if (next != current || purge) {
             val now = System.currentTimeMillis()
             var json = serialize(next, keptAt, now)
             // The oldest go first until the address fits its budget (JSON escaping can grow a body).
-            while (json.length > MAX_FILE_CHARS && next.isNotEmpty()) {
+            while (json.length > MAX_FILE_CHARS && next.size > 1) {
                 next = next.dropLast(1)
+                json = serialize(next, keptAt, now)
+            }
+            // The newest never goes: for these providers the copy here is the only one. Alone over
+            // the budget (escaping can grow a body sixfold), its bodies are cut further instead.
+            var bodyChars = MAX_BODY_CHARS
+            while (json.length > MAX_FILE_CHARS && bodyChars > 0) {
+                bodyChars /= 2
+                next = next.map { it.withBodiesWithin(bodyChars) }
                 json = serialize(next, keptAt, now)
             }
             prefs.put(target to json)
@@ -158,6 +166,7 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         .put("html", m.html)
         .put("text", m.text)
         .put("to", m.to)
+        .apply { if (m.truncated) put("truncated", true) }
 
     private fun fromJson(o: JSONObject) = MailSummary(
         id = o.getString("id"),
@@ -167,6 +176,7 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         html = o.text("html"),
         text = o.text("text"),
         to = o.text("to"),
+        truncated = o.optBoolean("truncated"),
     )
 
     private companion object {
@@ -195,10 +205,37 @@ class MessageCache(private val prefs: Prefs, private val migrate: () -> Unit = {
         }
 
         const val MAX_MESSAGES = 50
-        const val MAX_BODY_CHARS = 64 * 1024
+        /**
+         * Longest body part kept. The copy here is the only one, so the bound sits well above real
+         * mail (a newsletter's HTML runs to a few hundred kilobytes; at 64 KiB most were cut); what
+         * it cuts is flagged [MailSummary.truncated] for the message screen to say so.
+         */
+        const val MAX_BODY_CHARS = 512 * 1024
         /** What one address may take on disk and in memory once parsed, all messages together. */
         const val MAX_FILE_CHARS = 2 * 1024 * 1024
         /** Kept emails go this long after the app kept them: they hold codes and sign-in links long expired. */
         const val MAX_AGE_MS = 7 * 24 * 3_600_000L
     }
+}
+
+/** Each body part within [max] characters, flagged [MailSummary.truncated] when one had to be cut. */
+private fun MailSummary.withBodiesWithin(max: Int): MailSummary {
+    val h = html?.let { cutHtml(it, max) }
+    val t = text?.let { cutText(it, max) }
+    val cut = h?.length != html?.length || t?.length != text?.length
+    return if (cut) copy(html = h, text = t, truncated = true) else this
+}
+
+/** The first [max] characters at most, never half a surrogate pair. */
+private fun cutText(s: String, max: Int): String {
+    if (s.length <= max) return s
+    return if (max > 0 && s[max - 1].isHighSurrogate()) s.substring(0, max - 1) else s.substring(0, max)
+}
+
+/** As [cutText], and never inside a tag: a half tag at the end would read as text in the plain view. */
+private fun cutHtml(s: String, max: Int): String {
+    val head = cutText(s, max)
+    if (head.length == s.length) return s
+    val open = head.lastIndexOf('<')
+    return if (open > head.lastIndexOf('>')) head.substring(0, open) else head
 }

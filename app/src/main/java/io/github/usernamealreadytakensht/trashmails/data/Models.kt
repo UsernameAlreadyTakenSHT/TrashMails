@@ -107,6 +107,8 @@ data class MailSummary(
     val ref: Map<String, String> = emptyMap(),
     /** The address the mail was sent to, when it is a variant of the inbox's (a DropMail extended address). */
     val to: String? = null,
+    /** Only the beginning of the body was kept: the local copy, the only one left, was cut to fit its bounds. */
+    val truncated: Boolean = false,
 )
 
 /** Longest sender, subject or recipient kept: real ones are far shorter. */
@@ -135,8 +137,11 @@ fun MailSummary.bounded(): MailSummary = copy(from = from.forHeader(), subject =
 /** False for a summary whose id or reference no real provider would send: dropped rather than kept. */
 fun MailSummary.isSane(): Boolean = id.length <= MAX_ID_CHARS && ref.all { (k, v) -> k.length <= MAX_ID_CHARS && v.length <= MAX_ID_CHARS }
 
-/** A message body. [text] is the provider's plain part, or one derived from [html] by the ViewModel. */
-data class MailContent(val html: String?, val text: String?)
+/**
+ * A message body. [text] is the provider's plain part, or one derived from [html] by the ViewModel;
+ * [truncated] when only its beginning was kept ([MailSummary.truncated]).
+ */
+data class MailContent(val html: String?, val text: String?, val truncated: Boolean = false)
 
 interface MailProvider {
     val provider: Provider

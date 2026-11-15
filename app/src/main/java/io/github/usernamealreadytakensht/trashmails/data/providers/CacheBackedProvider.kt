@@ -17,7 +17,7 @@ internal interface CacheBackedProvider : MailProvider {
     override suspend fun getMessage(inbox: Inbox, summary: MailSummary): MailContent {
         // The bodies travel with the summary; after a process death only the cached copy has them.
         val m = summary.takeIf { it.html != null || it.text != null } ?: cache.load(inbox.key).firstOrNull { it.id == summary.id } ?: summary
-        return MailContent(html = m.html, text = m.text)
+        return MailContent(html = m.html, text = m.text, truncated = m.truncated)
     }
 
     override val canDeleteMessages get() = true

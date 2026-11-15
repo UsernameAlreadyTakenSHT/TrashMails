@@ -115,4 +115,17 @@ class TempmailLolCacheRaceTest {
         assertEquals(listOf("Third", "Second"), provider.listMessages(inbox).map(MailSummary::subject))
         assertEquals(listOf("Third", "Second"), cache.load(inbox.key).map(MailSummary::subject))
     }
+
+    @Test
+    fun aBodyCutToFitTheCache_isReportedAsCut_evenAfterAProcessDeath() = runBlocking {
+        val cache = MessageCache(MemoryPrefs())
+        val long = "x".repeat(600_000)
+        val http = FakeHttp().on("/inbox?token=", body("""{"emails":[{"from":"a@example.com","subject":"Big","body":"$long","html":null,"date":1789415400000}]}"""))
+        val provider = TempmailLolProvider(http, cache)
+        val listed = provider.listMessages(inbox).single()
+
+        assertTrue(provider.getMessage(inbox, listed).truncated)
+        // Back from a process death the summary carries no body: the cached copy says it too.
+        assertTrue(provider.getMessage(inbox, MailSummary(listed.id, "", "", 0)).truncated)
+    }
 }

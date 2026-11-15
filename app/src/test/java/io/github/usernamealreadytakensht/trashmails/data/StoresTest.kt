@@ -288,6 +288,52 @@ class MessageCacheTest {
     }
 
     @Test
+    fun aNewsletterSizedBody_isKeptWhole() {
+        // 200 000 characters: cut to 64 Ki before, with nothing on screen to say so.
+        val kept = cache.update("k") { listOf(long) }.single()
+        assertEquals(200_000, kept.html!!.length)
+        assertFalse(kept.truncated)
+        assertFalse(cache.load("k").single().truncated)
+    }
+
+    @Test
+    fun aBodyOverItsBound_isCut_andSaysSo_acrossALoad() {
+        val huge = long.copy(html = "x".repeat(600_000), text = "y".repeat(600_000))
+        val kept = cache.update("k") { listOf(huge) }.single()
+        assertEquals(512 * 1024, kept.html!!.length)
+        assertEquals(512 * 1024, kept.text!!.length)
+        assertTrue(kept.truncated)
+        assertTrue(cache.load("k").single().truncated)
+    }
+
+    @Test
+    fun aCutBody_neverEndsInsideATag() {
+        // The cut falls inside "<a href=…": what is left must not end on half a tag.
+        val html = "<p>" + "x".repeat(512 * 1024 - 10) + "<a href=\"https://example.com/\">link</a>"
+        val kept = cache.update("k") { listOf(long.copy(html = html)) }.single()
+        assertTrue(kept.html!!.endsWith("x"))
+        assertTrue(kept.truncated)
+    }
+
+    @Test
+    fun aCutBody_neverEndsOnHalfASurrogatePair() {
+        val html = "x".repeat(512 * 1024 - 1) + "😀" + "tail"
+        val kept = cache.update("k") { listOf(long.copy(html = html)) }.single()
+        assertFalse(kept.html!!.last().isHighSurrogate())
+    }
+
+    @Test
+    fun aSingleMessageOverTheBudget_isShrunk_notDropped() {
+        // Control characters escape to six characters each in JSON: 3 M of them for one message.
+        val hostile = long.copy(html = "\u0001".repeat(500_000))
+        val kept = cache.update("k") { listOf(hostile) }
+        assertEquals(listOf("1"), kept.map { it.id })
+        assertTrue(kept.single().truncated)
+        assertTrue((prefs.getString("k")?.length ?: 0) <= 2 * 1024 * 1024)
+        assertEquals(listOf("1"), cache.load("k").map { it.id })
+    }
+
+    @Test
     fun aForgottenAddress_isNotWrittenBack() {
         cache.update("k") { listOf(long) }
         cache.clear("k")

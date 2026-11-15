@@ -160,6 +160,8 @@ fun MessageScreen(
                 )
             }
             HorizontalDivider()
+            // Said whatever the view: the plain text and the HTML both stop where the kept copy does.
+            if (content?.truncated == true) BodyBanner("Too long to keep whole: only the beginning of this message was saved")
             val text = content?.text
             when {
                 content == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -256,11 +258,12 @@ private fun PlainBody(fullText: String, onLink: (Uri) -> Unit) {
     }
 }
 
-/** One line above the body telling what is not shown, with the action that shows it. */
+/** One line above the body telling what is not shown, with the action that shows it when there is one. */
 @Composable
-private fun BodyBanner(text: String, action: String, onAction: () -> Unit) {
+private fun BodyBanner(text: String, action: String? = null, onAction: () -> Unit = {}) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+        // Without a button, the padding gives the line the height the button would.
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp).padding(vertical = if (action == null) 12.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -269,7 +272,7 @@ private fun BodyBanner(text: String, action: String, onAction: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onAction) { Text(action) }
+        if (action != null) TextButton(onClick = onAction) { Text(action) }
     }
     HorizontalDivider()
 }
