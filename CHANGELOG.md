@@ -1,3 +1,18 @@
+## v0.5.12 — 2026-11-15
+
+The fixes from an audit of 0.5.11: two behaviours that lost mail or a slot of the quota, and a handful of smaller ones.
+
+### Fixed
+- **Long emails are no longer cut at 64 KiB without a word** (tempmail.lol, DropMail.me, whose local copy is the only one): body parts are kept up to 512 KiB, never cut inside a tag, and a message that still had to be cut says so on its screen. The newest message of an address is never dropped to fit its budget; its body is shortened instead.
+- **A name the service would refuse is refused before the address is created**: an Inbox Kitten name of one or two characters was created locally, took a slot of the quota, then failed at every refresh. The create dialog states the minimum; every provider refuses a name over 64 characters.
+- **An address's creation time is the app's own** (Guerrilla Mail, Burner Kiwi took the server's), so a stale server time can no longer make "forget old addresses" drop it at once.
+- **DropMail.me replaces its device token on a 403 only when the server says the token is the problem**: a firewall page that merely mentions a token no longer strands the sessions.
+
+### Changed
+- **Auto-refresh backs off after failures**: the wait doubles at each failure in a row, up to 16 times the interval or 15 minutes, and a success resets it; a manual refresh is never held back. Leaving a message of an inbox that never listed no longer fires a request each time.
+- **The read state is written only when it changes**, not at every refresh.
+- Lint clean.
+
 ## v0.5.11 — 2026-11-08
 
 Maintenance: the build tools, the libraries and the CI move to their current releases. No change in what the app does.
