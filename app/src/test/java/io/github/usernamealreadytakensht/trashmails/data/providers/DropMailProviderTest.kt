@@ -192,6 +192,17 @@ class DropMailProviderTest {
     }
 
     @Test
+    fun a403PageThatMerelySaysToken_keepsAFreshToken() = runBlocking {
+        val prefs = MemoryPrefs()
+        prefs.put("token" to "af_oldtoken1", "tokenExpiresAt" to (System.currentTimeMillis() + 24 * 3_600_000L - 600_000L).toString())
+        // A firewall's page: the word is there, the server's authentication_error is not.
+        val http = http().on("/api/graphql/af_oldtoken1", httpError(403, "<html>Blocked: invalid CSRF token</html>"))
+        runCatching { provider(http, prefs).createInbox(null, CreateOptions()) }
+        assertEquals(listOf("/api/graphql/af_oldtoken1"), http.urls().map { it.substringAfter("dropmail.me") })
+        assertEquals("af_oldtoken1", prefs.getString("token"))
+    }
+
+    @Test
     fun aDamagedTokenWithAFarExpiry_isReplaced_notWaitedFor() = runBlocking {
         val box = object : SecretBox {
             override fun seal(plain: String, context: String) = "k2:$context|$plain"

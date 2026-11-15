@@ -285,8 +285,12 @@ class DropMailProvider(
         } catch (e: HttpException) {
             // A 403 may be the token rejected, or a firewall or rate limit: replacing the token
             // strands every session opened with it, so it is replaced when the server says the
-            // token is the problem, and otherwise at most once an hour.
-            val tokenRejected = "authentication_error" in e.body || "token" in e.body.lowercase()
+            // token is the problem, and otherwise at most once an hour. The server says so in its own
+            // JSON (`errors[0].extensions.code`, checked November 2026): a page that merely holds the
+            // word, as a firewall's might, no longer counts.
+            val tokenRejected = runCatching {
+                JSONObject(e.body).firstError()?.optJSONObject("extensions")?.optString("code") == "authentication_error"
+            }.getOrDefault(false)
             if (e.code == 403 && retry && (tokenRejected || tokenAgeMs() > TOKEN_MIN_AGE_MS)) {
                 putToken(KEY_TOKEN to "", KEY_TOKEN_EXPIRES to "")
                 return graphql(query, retry = false)
