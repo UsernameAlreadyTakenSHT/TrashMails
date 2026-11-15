@@ -62,6 +62,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
 import io.github.usernamealreadytakensht.trashmails.data.MailContent
 import io.github.usernamealreadytakensht.trashmails.data.MailSummary
 import io.github.usernamealreadytakensht.trashmails.data.Provider
@@ -206,7 +207,7 @@ fun MessageScreen(
     pendingLink?.let { link ->
         LinkDialog(
             url = link,
-            onOpen = { pendingLink = null; openLink(context, Uri.parse(link)) },
+            onOpen = { pendingLink = null; openLink(context, link.toUri()) },
             // Sensitive: a sign-in or reset link carries a token the clipboard preview would show.
             onCopy = { pendingLink = null; context.copyToClipboard(link, "Link copied", sensitive = true) },
             onDismiss = { pendingLink = null },
@@ -244,7 +245,7 @@ private fun PlainBody(fullText: String, onLink: (Uri) -> Unit) {
                 val url = m.value.trimEnd { it in URL_TRAIL }
                 if (url.length < 10) continue
                 append(text, last, m.range.first)
-                withLink(LinkAnnotation.Url(url, linkStyle) { onLink(Uri.parse(url)) }) { append(url) }
+                withLink(LinkAnnotation.Url(url, linkStyle) { onLink(url.toUri()) }) { append(url) }
                 last = m.range.first + url.length
             }
             append(text, last, text.length)
@@ -373,7 +374,7 @@ private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClie
  */
 @Composable
 private fun LinkDialog(url: String, onOpen: () -> Unit, onCopy: () -> Unit, onDismiss: () -> Unit) {
-    val uri = Uri.parse(url)
+    val uri = url.toUri()
     // For mail, who it goes to (what will be kept of the link), one per line; for a site, its host.
     val site = if (uri.scheme.equals("mailto", ignoreCase = true)) mailtoRecipients(url) else uri.host?.let(::displayHost) ?: url
     AlertDialog(
@@ -460,7 +461,7 @@ private fun openLink(context: Context, uri: Uri) {
         // A compose screen with the recipients, subject and body only: no cc/bcc the sender slipped
         // in, nor an attach= some mail apps would honour. SENDTO reaches mail apps only.
         parseMailto(uri.toString()).let { draft ->
-            Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + draft.to.joinToString(",") { Uri.encode(it, "@") }))
+            Intent(Intent.ACTION_SENDTO, ("mailto:" + draft.to.joinToString(",") { Uri.encode(it, "@") }).toUri())
                 .apply {
                     draft.subject?.let { putExtra(Intent.EXTRA_SUBJECT, it) }
                     draft.body?.let { putExtra(Intent.EXTRA_TEXT, it) }

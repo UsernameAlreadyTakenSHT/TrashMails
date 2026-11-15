@@ -61,11 +61,6 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * From Android 12 the whole app configuration can follow the chosen theme, so the window
-     * background, the values-night resources and the message WebView switch with it; before that
-     * only the Compose colours do.
-     */
-    /**
      * "Block screenshots": FLAG_SECURE keeps the screen out of captures and recordings, and from
      * Android 14 the content is also withheld from accessibility services that are not
      * accessibility tools (which FLAG_SECURE does not stop); TalkBack and the like still read it.
@@ -80,6 +75,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * From Android 12 the whole app configuration can follow the chosen theme, so the window
+     * background, the values-night resources and the message WebView switch with it; before that
+     * only the Compose colours do.
+     */
     private fun applyNightMode(theme: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val manager = getSystemService(UiModeManager::class.java) ?: return

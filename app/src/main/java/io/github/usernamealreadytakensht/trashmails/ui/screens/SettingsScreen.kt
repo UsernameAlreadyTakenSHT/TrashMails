@@ -27,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -47,7 +48,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     /** A "forget after" choice (hours) that would drop addresses right now, awaiting confirmation; 0 = none. */
-    var pendingForget by rememberSaveable { mutableStateOf(0) }
+    var pendingForget by rememberSaveable { mutableIntStateOf(0) }
     if (pendingForget > 0) {
         val hours = pendingForget
         val dropped = countOlderThan(hours)
