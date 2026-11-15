@@ -109,8 +109,14 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
 
     private fun saveRead() = readStore.save(ReadStore.State(read, unread))
 
-    private fun setUnread(inbox: Inbox, list: List<MailSummary>) {
-        unread = unread + (inbox.key to countUnread(inbox, list))
+    /**
+     * Records the unread count of [inbox] for [list]. Most refreshes change nothing, and then nothing
+     * is written; [readChanged] when the read ids changed, which must reach the disk either way.
+     */
+    private fun setUnread(inbox: Inbox, list: List<MailSummary>, readChanged: Boolean = false) {
+        val count = countUnread(inbox, list)
+        if (!readChanged && unread[inbox.key] == count) return
+        unread = unread + (inbox.key to count)
         saveRead()
     }
 
@@ -126,9 +132,21 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     private data class Fetch(val at: Long, val wallAt: Long, val list: List<MailSummary>)
     /** Last successful listing per inbox key. */
     private val lastFetch = mutableMapOf<String, Fetch>()
-    private fun lastFetchAt(inbox: Inbox): Long = lastFetch[inbox.key]?.at ?: 0L
     /** When each inbox was last asked for, successfully or not (monotonic clock): what throttles refreshes. */
     private val lastAttempt = mutableMapOf<String, Long>()
+    /** Listings of each inbox that failed in a row: the automatic ones wait longer after each. */
+    private val failuresInRow = mutableMapOf<String, Int>()
+
+    /**
+     * The wait before the next automatic listing of [inbox]: the interval, doubled at each failure in
+     * a row (16 times at most, and never past [MAX_BACKOFF_MS] unless the interval itself is longer).
+     * A service answering 429 or 500, or a phone offline, is not asked again every 30 s.
+     */
+    private fun pollDelay(inbox: Inbox): Long {
+        val interval = settings.pollIntervalMs
+        val failures = (failuresInRow[inbox.key] ?: 0).coerceAtMost(4)
+        return (interval shl failures).coerceAtMost(maxOf(interval, MAX_BACKOFF_MS))
+    }
     /** Milliseconds before [inbox] may be listed again on request, 0 when it may be now. */
     private fun refreshWait(inbox: Inbox): Long {
         val last = lastAttempt[inbox.key] ?: return 0L
@@ -246,6 +264,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 pendingDeletes.remove(it.key)
                 dropRecentBodies(it.key)
                 lastAttempt.remove(it.key)
+                failuresInRow.remove(it.key)
             }
             inboxes = kept
             forgetEmptiedProviders(old)
@@ -334,6 +353,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         pendingDeletes.remove(inbox.key)
         dropRecentBodies(inbox.key)
         lastAttempt.remove(inbox.key)
+        failuresInRow.remove(inbox.key)
         unread = unread - inbox.key
         read = read - inbox.key
         saveRead()
@@ -369,7 +389,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         stopPolling()
         if (!isRead(inbox, summary)) {
             read = read + (inbox.key to read[inbox.key].orEmpty() + summary.id)
-            if (listLoaded) setUnread(inbox, messages)
+            if (listLoaded) setUnread(inbox, messages, readChanged = true)
             else {
                 // Reopened after a process death, before any listing: one unread fewer, not zero.
                 unread = unread + (inbox.key to ((unread[inbox.key] ?: 1) - 1).coerceAtLeast(0))
@@ -484,6 +504,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             // Ids deduplicated: the list is keyed by them, and a provider listing one twice would crash it.
             providerFor(inbox).listMessages(inbox).filter { it.isSane() }.distinctBy { it.id }.map { it.bounded() }
         }
+        if (list == null) failuresInRow[inbox.key] = (failuresInRow[inbox.key] ?: 0) + 1
+        else failuresInRow.remove(inbox.key)
         if (list == null && !listLoaded && messages.isEmpty()) {
             // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
             val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }
@@ -509,18 +531,19 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     }
 
     /**
-     * Lists [inbox] then again at the interval chosen in [settings] until [stopPolling] (once only
-     * in manual mode). With [immediate] false the first listing waits for the interval to elapse
-     * since the last one of the same inbox.
+     * Lists [inbox] then again at the interval chosen in [settings] (longer after failures, see
+     * [pollDelay]) until [stopPolling], once only in manual mode. With [immediate] false the first
+     * listing waits that long since the last attempt on the same inbox — an attempt, not a success:
+     * an inbox that never listed was asked again each time a message screen was left.
      */
     private fun startPolling(inbox: Inbox, immediate: Boolean = true, manual: Boolean = false) {
         stopPolling()
         if (!foreground) return
-        val interval = settings.pollIntervalMs
         pollJob = viewModelScope.launch {
-            if (!immediate && lastFetchAt(inbox) > 0) {
+            val last = lastAttempt[inbox.key]
+            if (!immediate && last != null) {
                 if (!settings.autoRefresh) return@launch
-                val wait = lastFetchAt(inbox) + interval - now()
+                val wait = last + pollDelay(inbox) - now()
                 if (wait > 0) delay(wait)
             }
             var first = true
@@ -528,7 +551,7 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
                 fetch(inbox, manual = manual && first)
                 first = false
                 if (!settings.autoRefresh) return@launch
-                delay(interval)
+                delay(pollDelay(inbox))
             }
         }
     }
@@ -571,6 +594,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
 
     private companion object {
         const val MANUAL_REFRESH_MIN_MS = 30_000L
+        /** Longest wait the failures stretch the auto-refresh to (a manual refresh is never held back by them). */
+        const val MAX_BACKOFF_MS = 15 * 60_000L
         const val MAX_RECENT_BODIES = 10
         const val MAX_RECENT_BODY_CHARS = 512 * 1024
         const val SAVED_INBOX = "screen.inbox"
