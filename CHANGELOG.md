@@ -1,3 +1,21 @@
+## v0.5.13 — 2026-11-20
+
+The fixes from a full review of 0.5.12: three that show in everyday use, and a handful of smaller ones.
+
+### Fixed
+- **A refresh interrupted by a rotation or a switch to another app starts again when you come back**: the cancelled request counted as an attempt, so the inbox could show "Could not load the inbox" for a whole interval, and "Manual only" refused a refresh for 30 s.
+- **A crash of the HTML renderer no longer closes the app**: the message falls back to plain text with a notice, and "View as HTML" tries again.
+- **Plain text decodes the HTML entities it used to leave as they were**: all of Latin-1 (`&Eacute;`, `&uuml;`, `&ntilde;`…), punctuation, spaces and arrows; the invisible ones marketing mails pad their preheader with (`&zwnj;`, `&shy;`) leave nothing. The copied text follows.
+- **Reopening an inbox that just failed waits the 30 s of a manual refresh** instead of sending a request each time; the kept copy shows meanwhile (tempmail.lol, DropMail.me).
+- **DropMail.me: past the limits of the kept mail, the bodies of a session are no longer downloaded again at every refresh.**
+- **DropMail.me: a session the server reports as gone without an error is restored** like an expired one.
+- **The "New address" dialog scrolls as a whole on a short window** (a phone in landscape), and the domain selector has a full-size touch target.
+- A message restored straight into its HTML view at start-up waits for the WebView traces to be cleared.
+
+### Changed
+- **Cancel during a creation no longer interrupts the request**: an address the service had already created joins the list, and counts in the quota, with a notice, instead of being left behind unseen.
+- **A service that moved its API behind a redirect says so** instead of a bare "HTTP 301".
+
 ## v0.5.12 — 2026-11-15
 
 The fixes from an audit of 0.5.11: two behaviours that lost mail or a slot of the quota, and a handful of smaller ones.

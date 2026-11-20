@@ -1,0 +1,4 @@
+- A refresh interrupted by a rotation or a switch to another app starts again when you come back
+- A crash of the HTML renderer no longer closes the app: the message falls back to plain text
+- Plain text decodes many more HTML entities (accented letters, invisible padding of marketing mails)
+- Cancel during a creation: an address the service already created joins the list instead of being lost
