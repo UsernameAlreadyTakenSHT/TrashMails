@@ -20,6 +20,7 @@ import io.github.usernamealreadytakensht.trashmails.data.ProviderException
 import io.github.usernamealreadytakensht.trashmails.data.text
 import io.github.usernamealreadytakensht.trashmails.data.textOrEmpty
 import io.github.usernamealreadytakensht.trashmails.data.works
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -117,7 +118,11 @@ class DropMailProvider(
         if (session == null) {
             // Lapsed (or never listed since a restore failed): back into a fresh session, which
             // holds no mail yet — what was received before stays in the cache.
-            if (json != null && json.errorCode() != "SESSION_NOT_FOUND") fail(json, "DropMail.me could not list the inbox")
+            // The server says so with SESSION_NOT_FOUND; a null session with no error at all means
+            // the same. Any other error (a rate limit, a reply without data) is a failure, not a lapse.
+            val lapsed = json == null || json.errorCode() == "SESSION_NOT_FOUND" ||
+                (json.firstError() == null && json.optJSONObject("data") != null)
+            if (!lapsed) fail(json, "DropMail.me could not list the inbox")
             restore(inbox, restoreKey)
             return cache.load(inbox.key)
         }
@@ -128,7 +133,10 @@ class DropMailProvider(
         val held = cache.load(inbox.key).map { it.id }.toSet() + tombstones(inbox) + received
         val unseen = (0 until ids.length()).mapNotNull { ids.optJSONObject(it)?.text("id") }
             .filter { it.length <= MAX_ID_CHARS }.filterNot { it in held }
-        if (unseen.isEmpty()) return cache.load(inbox.key)
+        // Nothing new, or only mails already fetched that the cache had no room for: their bodies
+        // (up to 100 mails of them) are not downloaded again at every refresh.
+        val leftOut = notKept[inbox.key].orEmpty()
+        if (unseen.all { it in leftOut }) return cache.load(inbox.key)
         val full = graphql("{ session(id: ${quote(sessionId)}) { id mails { $MAIL_FIELDS } } }")
         val arr = full.data("session")?.optJSONArray("mails") ?: fail(full, "DropMail.me could not list the inbox")
         val fresh = (0 until arr.length()).mapNotNull { i ->
@@ -157,9 +165,17 @@ class DropMailProvider(
             }
             val keptIds = kept.map { it.id }.toSet()
             recordReceived(inbox, receivedNow + fresh.map { it.id }.filter { it in keptIds })
+            notKept[inbox.key] = fresh.map { it.id }.filterNot { it in keptIds }.toSet()
         }
         return kept
     }
+
+    /**
+     * Ids of the mails fetched but cut by the cache's bounds, per inbox key, for this process only:
+     * they stay to come (a deletion makes room, and forgets them here), without being fetched again
+     * at every refresh until then.
+     */
+    private val notKept = ConcurrentHashMap<String, Set<String>>()
 
     /** Stores [ids] as received for [inbox]: the latest, bounded in count and in size. */
     private fun recordReceived(inbox: Inbox, ids: List<String>) {
@@ -178,6 +194,8 @@ class DropMailProvider(
             prefs.put(deletedKey(inbox) to arr.toString())
             known.filterNot { it.id == summary.id }
         }
+        // Room was made: a mail left out for want of it is fetched again at the next refresh.
+        notKept.remove(inbox.key)
         return true
     }
 
@@ -215,6 +233,7 @@ class DropMailProvider(
     override fun forgetInbox(inbox: Inbox) {
         // One step under the cache lock: a restoration in flight cannot save its session in between.
         cache.clear(inbox.key) { prefs.remove(sessionKey(inbox), deletedKey(inbox), receivedKey(inbox)) }
+        notKept.remove(inbox.key)
     }
 
     /**

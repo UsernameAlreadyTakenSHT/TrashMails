@@ -240,10 +240,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
     }
 
     fun updateSettings(s: Settings) {
-        val intervalChanged = s.pollIntervalSec != settings.pollIntervalSec
         settings = s
         settingsStore.save(s)
-        if (intervalChanged) currentInbox()?.let { startPolling(it, immediate = false) }
         forgetOldInboxes()
     }
 
@@ -290,10 +288,13 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         creating = true
         createError = null
         createJob = viewModelScope.launch {
-            val inbox = attempt("Could not create the address", onError = { createError = it }) {
+            val job = coroutineContext[Job]
+            val inbox = attempt("Could not create the address", onError = { if (createJob === job) createError = it }) {
                 providers.getValue(provider).createInbox(name, options)
             }
-            creating = false
+            // Cancelled meanwhile (see [cancelCreate]): the dialog is gone, or busy with another creation.
+            val abandoned = createJob !== job
+            if (!abandoned) creating = false
             inbox ?: return@launch
             // The same inbox created again (a Guerrilla name on another domain, or scrambled) takes
             // the place of its earlier entry: what is listed and opened is what was just created.
@@ -301,15 +302,23 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
             store.save(inboxes)
             quota.record(provider)
             refreshQuota()
+            if (abandoned) {
+                notice = "${inbox.address} had already been created: it is in the list"
+                return@launch
+            }
             if (settings.lastProvider != provider) updateSettings(settings.copy(lastProvider = provider))
             if (settings.copyOnCreate) getApplication<Application>().copyToClipboard(inbox.address, "Copied: ${inbox.address}", sensitive = inbox.provider.publicInbox)
             openInbox(inbox)
         }
     }
 
-    /** Abandons a creation in progress (the dialog was dismissed). */
+    /**
+     * Abandons a creation in progress (the dialog was dismissed). The request itself is left to
+     * finish: the service may have created the address already (a mail.tm account, a DropMail.me
+     * session), and aborting then left it there, unlisted and uncounted. If it does come back, the
+     * address joins the list and takes its slot of the quota; a failure is not reported.
+     */
     fun cancelCreate() {
-        createJob?.cancel()
         createJob = null
         creating = false
         createError = null
@@ -375,7 +384,8 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         } else {
             messages = emptyList()
             listLoaded = false
-            startPolling(inbox)
+            // Asked a moment ago without success: reopening is no way around the wait a manual refresh obeys.
+            startPolling(inbox, holdBack = refreshWait(inbox))
         }
     }
 
@@ -495,22 +505,27 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
      * snackbar at every tick.
      */
     private suspend fun fetch(inbox: Inbox, manual: Boolean) {
+        val attemptBefore = lastAttempt[inbox.key]
         lastAttempt[inbox.key] = now()
         listLoading = true
-        val list = attempt("Could not refresh", onError = { msg ->
-            listProblem = msg
-            if (manual) { error = msg; lastFetchError = msg }
-        }) {
-            // Ids deduplicated: the list is keyed by them, and a provider listing one twice would crash it.
-            providerFor(inbox).listMessages(inbox).filter { it.isSane() }.distinctBy { it.id }.map { it.bounded() }
+        val list = try {
+            attempt("Could not refresh", onError = { msg ->
+                listProblem = msg
+                if (manual) { error = msg; lastFetchError = msg }
+            }) {
+                // Ids deduplicated: the list is keyed by them, and a provider listing one twice would crash it.
+                providerFor(inbox).listMessages(inbox).filter { it.isSane() }.distinctBy { it.id }.map { it.bounded() }
+            }
+        } catch (e: CancellationException) {
+            // Cut short (a rotation, the app left for a second): not an attempt to wait out. Counted,
+            // it left the inbox unlisted for a whole interval, and for good in manual mode.
+            if (attemptBefore == null) lastAttempt.remove(inbox.key) else lastAttempt[inbox.key] = attemptBefore
+            throw e
         }
         if (list == null) failuresInRow[inbox.key] = (failuresInRow[inbox.key] ?: 0) + 1
         else failuresInRow.remove(inbox.key)
-        if (list == null && !listLoaded && messages.isEmpty()) {
-            // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
-            val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }
-            if (kept.isNotEmpty()) { messages = kept; listLoaded = true }
-        }
+        // Offline, captcha, quota: what the provider kept locally is still worth showing, the problem above it.
+        if (list == null && !listLoaded && messages.isEmpty()) showKept(inbox)
         if (list != null) {
             val hidden = pendingDeletes[inbox.key]
             val shown = if (hidden.isNullOrEmpty()) list else list.filterNot { it.id in hidden }
@@ -530,18 +545,28 @@ class MailViewModel(app: Application, private val savedState: SavedStateHandle) 
         listLoading = false
     }
 
+    /** Shows what the provider kept locally for [inbox], if anything, while it cannot be listed. */
+    private suspend fun showKept(inbox: Inbox) {
+        val kept = withContext(Dispatchers.Default) { cache.load(inbox.key) }
+        if (kept.isNotEmpty()) { messages = kept; listLoaded = true }
+    }
+
     /**
      * Lists [inbox] then again at the interval chosen in [settings] (longer after failures, see
      * [pollDelay]) until [stopPolling], once only in manual mode. With [immediate] false the first
      * listing waits that long since the last attempt on the same inbox — an attempt, not a success:
-     * an inbox that never listed was asked again each time a message screen was left.
+     * an inbox that never listed was asked again each time a message screen was left. With [holdBack],
+     * the first listing waits that many milliseconds whatever the mode, the local copy shown meanwhile.
      */
-    private fun startPolling(inbox: Inbox, immediate: Boolean = true, manual: Boolean = false) {
+    private fun startPolling(inbox: Inbox, immediate: Boolean = true, manual: Boolean = false, holdBack: Long = 0L) {
         stopPolling()
         if (!foreground) return
         pollJob = viewModelScope.launch {
             val last = lastAttempt[inbox.key]
-            if (!immediate && last != null) {
+            if (holdBack > 0) {
+                showKept(inbox)
+                delay(holdBack)
+            } else if (!immediate && last != null) {
                 if (!settings.autoRefresh) return@launch
                 val wait = last + pollDelay(inbox) - now()
                 if (wait > 0) delay(wait)

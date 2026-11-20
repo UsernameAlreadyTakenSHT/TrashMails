@@ -31,6 +31,21 @@ class HtmlTextTest {
     }
 
     @Test
+    fun namedEntities_coverLatin1BothCases_andTheUsualSigns() {
+        assertEquals("École, âge, sûr, naïf, cœur, 20 °C", htmlToText("&Eacute;cole, &acirc;ge, s&ucirc;r, na&iuml;f, c&oelig;ur, 20&nbsp;&deg;C"))
+        assertEquals("über España ÿ ½ → ‹x›", htmlToText("&uuml;ber Espa&ntilde;a &yuml; &frac12; &rarr; &lsaquo;x&rsaquo;"))
+        // Case matters: the capital is another letter, and a name in the wrong case is not an entity.
+        assertEquals("É é &EACUTE;", htmlToText("&Eacute; &eacute; &EACUTE;"))
+    }
+
+    @Test
+    fun invisibleEntities_leaveNothingBehind() {
+        // The filler of a newsletter's preheader.
+        assertEquals("Your code", htmlToText("Your code&zwnj;&nbsp;&zwnj;&nbsp;&shy;&zwj;"))
+        assertEquals("a b c", htmlToText("a&ensp;b&thinsp;c"))
+    }
+
+    @Test
     fun openingBlockTagsBreakLines_andLinkIsNotAListItem() {
         assertEquals("a\nb", htmlToText("<div>a<p>b"))
         assertEquals("x", htmlToText("<link rel=\"stylesheet\" href=\"s.css\">x"))

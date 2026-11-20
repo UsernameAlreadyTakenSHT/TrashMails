@@ -50,6 +50,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -281,7 +282,12 @@ private fun CreateInboxDialog(
     val exhausted = status?.exhausted == true
     // One height whatever the provider shows under the list (helper text, options), so switching
     // providers does not make the dialog jump; the dialog clamps it on small screens.
-    val contentHeight = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * 0.75f).toDp() }
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val contentHeight = windowHeight * 0.75f
+    // A window too low for the list and the fields at once (a phone held sideways): there the
+    // fields took all of it, the list was left no height at all and the options were cut. All of
+    // it scrolls as one instead.
+    val cramped = windowHeight < CRAMPED_WINDOW_HEIGHT
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -290,11 +296,14 @@ private fun CreateInboxDialog(
         properties = DialogProperties(dismissOnClickOutside = !creating, dismissOnBackPress = !creating),
         title = { Text("New address") },
         text = {
-            Column(Modifier.height(contentHeight), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.height(contentHeight).then(if (cramped) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 // The list takes what the fields below leave and scrolls on its own, so the name
                 // field and the options stay in sight whatever the font size.
                 Column(
-                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    if (cramped) Modifier else Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     PROVIDER_GROUPS.forEach { (title, providers) ->
@@ -380,6 +389,9 @@ private fun CreateInboxDialog(
     infoFor?.let { p -> ProviderInfoDialog(p, onDismiss = { infoFor = null }) }
 }
 
+/** Below this window height the create dialog scrolls as a whole (see [CreateInboxDialog]). */
+private val CRAMPED_WINDOW_HEIGHT = 480.dp
+
 /** The domain chosen, at the end of the name field ("@domain ▾"), opening the list of choices on tap. */
 @Composable
 private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String?) -> Unit, enabled: Boolean) {
@@ -387,6 +399,8 @@ private fun DomainMenu(provider: Provider, domain: String?, onDomain: (String?) 
     Box {
         Row(
             Modifier
+                // The text alone is some 20 dp high: the touch target is brought to the usual 48 dp.
+                .minimumInteractiveComponentSize()
                 .clickable(enabled = enabled, onClickLabel = "Choose the domain", role = Role.DropdownList) { menuOpen = true }
                 .semantics { contentDescription = "Domain ${domain ?: "random"}" }
                 .padding(start = 4.dp, end = 8.dp),

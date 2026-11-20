@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebStorage
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -96,6 +97,8 @@ fun MessageScreen(
     val context = LocalContext.current
     var showHtml by rememberSaveable(summary.id) { mutableStateOf(settings.renderHtml) }
     var loadImages by rememberSaveable(summary.id) { mutableStateOf(settings.loadImages) }
+    /** The HTML view of this message lost its renderer (see [MailWebViewClient.onRenderProcessGone]). */
+    var htmlFailed by rememberSaveable(summary.id) { mutableStateOf(false) }
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     /** A tapped link waiting for the user's go-ahead (as a string: Uri is not saveable). */
@@ -174,10 +177,13 @@ fun MessageScreen(
                 }
                 showHtml && content.html != null -> {
                     if (!loadImages) BodyBanner("Remote content (images, styles…) not loaded", "Load") { loadImages = true }
-                    HtmlBody(content.html, loadImages, onLink)
+                    HtmlBody(content.html, loadImages, onLink, onRendererGone = { showHtml = false; htmlFailed = true })
                 }
                 !text.isNullOrBlank() -> {
-                    if (hasHtml) BodyBanner("Shown as plain text", "View as HTML") { showHtml = true }
+                    if (hasHtml) BodyBanner(
+                        if (htmlFailed) "The HTML view of this message stopped working: shown as plain text" else "Shown as plain text",
+                        "View as HTML",
+                    ) { showHtml = true }
                     PlainBody(text, onLink)
                 }
                 // An HTML mail with no text at all (images only): say so, and offer the HTML view.
@@ -286,7 +292,9 @@ private fun BodyBanner(text: String, action: String? = null, onAction: () -> Uni
 @Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
+private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit, onRendererGone: () -> Unit) {
+    // Not while the traces of an earlier run are still being deleted under the WebView's directory.
+    if (!webViewTracesCleared) return
     // Follow the app theme (which may override the system one), not the system setting.
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val background = MaterialTheme.colorScheme.surface.toArgb()
@@ -304,7 +312,7 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) settings.isAlgorithmicDarkeningAllowed = true
                     else settings.forceDark = WebSettings.FORCE_DARK_ON
                 }
-                webViewClient = MailWebViewClient(onLink)
+                webViewClient = MailWebViewClient(onLink, onRendererGone)
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
@@ -331,7 +339,8 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
         },
         // Leaving the message (or switching to plain text) frees the renderer at once.
         onRelease = { view ->
-            view.stopLoading()
+            // A view whose renderer is gone is only to be destroyed.
+            if (!(view.webViewClient as MailWebViewClient).rendererGone) view.stopLoading()
             view.clearCache(true)
             WebStorage.getInstance().deleteAllData()
             CookieManager.getInstance().removeAllCookies(null)
@@ -351,9 +360,22 @@ private fun HtmlBody(html: String, loadImages: Boolean, onLink: (Uri) -> Unit) {
  *   behind WebSettings.blockNetworkLoads.
  * Requests are intercepted off the main thread, hence the flag kept here rather than read from
  * the WebView.
+ *
+ * A renderer that crashes or is killed (a page built to exhaust it, or the system short of memory)
+ * is reported through [onRendererGone] instead of taking the whole app down with it, which is what
+ * Android does when the client does not answer for it.
  */
-private class MailWebViewClient(private val onLink: (Uri) -> Unit) : WebViewClient() {
+private class MailWebViewClient(private val onLink: (Uri) -> Unit, private val onRendererGone: () -> Unit) : WebViewClient() {
     @Volatile var blockRemote = true
+    /** Set once the renderer is gone: the view is dead and must go. */
+    var rendererGone = false
+        private set
+
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        rendererGone = true
+        onRendererGone()
+        return true
+    }
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (request.isForMainFrame && request.hasGesture()) onLink(request.url)
@@ -442,11 +464,22 @@ private val WEBVIEW_TRACES = listOf(
  * killed while a message was open never got there.
  */
 fun clearWebViewTraces(context: Context) {
-    val root = File(context.dataDir, "app_webview")
-    for (dir in listOf(root, File(root, "Default"))) {
-        WEBVIEW_TRACES.forEach { runCatching { File(dir, it).deleteRecursively() } }
+    try {
+        val root = File(context.dataDir, "app_webview")
+        for (dir in listOf(root, File(root, "Default"))) {
+            WEBVIEW_TRACES.forEach { runCatching { File(dir, it).deleteRecursively() } }
+        }
+    } finally {
+        webViewTracesCleared = true
     }
 }
+
+/**
+ * Set once [clearWebViewTraces] is done, whatever it managed to delete: [HtmlBody] creates no
+ * WebView before that (a message restored after a process death is on screen within a frame or
+ * two, while the deletion runs on its own thread).
+ */
+private var webViewTracesCleared by mutableStateOf(false)
 
 /** What Chrome itself sends with user-agent reduction: no model, no build, a frozen Android version. */
 private const val GENERIC_USER_AGENT =

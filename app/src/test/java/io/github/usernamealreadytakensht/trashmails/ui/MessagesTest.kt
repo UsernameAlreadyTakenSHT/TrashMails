@@ -1,6 +1,7 @@
 package io.github.usernamealreadytakensht.trashmails.ui
 
 import io.github.usernamealreadytakensht.trashmails.data.ProviderException
+import io.github.usernamealreadytakensht.trashmails.data.HttpException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.net.UnknownHostException
@@ -23,5 +24,14 @@ class MessagesTest {
     fun transportErrors_getTheirOwnWording() {
         assertEquals("No internet connection", UnknownHostException("dropmail.me").userMessage("fallback"))
         assertEquals("fallback", IllegalStateException("boom").userMessage("fallback"))
+    }
+
+    @Test
+    fun aRedirect_isSaidForWhatItIs() {
+        assertEquals(
+            "api.example.com has moved its API (HTTP 308): this version of the app cannot follow it",
+            HttpException(308, "api.example.com").userMessage("fallback"),
+        )
+        assertEquals("api.example.com answered HTTP 500", HttpException(500, "api.example.com").userMessage("fallback"))
     }
 }

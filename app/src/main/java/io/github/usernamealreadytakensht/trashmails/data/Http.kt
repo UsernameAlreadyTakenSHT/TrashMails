@@ -149,5 +149,12 @@ private val ADDRESS = Regex("""[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-
 fun checkedAddress(address: String, provider: Provider): String =
     address.takeIf { ADDRESS.matches(it) } ?: throw ProviderException("${provider.label} sent an address the app cannot use")
 
-/** Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401), [body] explain. */
-class HttpException(val code: Int, host: String, val body: String = "") : ProviderException("$host answered HTTP $code")
+/**
+ * Non-2xx response; [code] lets a provider react (e.g. refresh a token on 401), [body] explain.
+ * A redirect is never followed (see [Http.client]): it is said for what it is, the service having
+ * moved its API, rather than as a bare status code.
+ */
+class HttpException(val code: Int, host: String, val body: String = "") : ProviderException(
+    if (code in 300..399) "$host has moved its API (HTTP $code): this version of the app cannot follow it"
+    else "$host answered HTTP $code"
+)

@@ -46,7 +46,7 @@ private val BLOCK_BREAK = Regex("""(?i)<br\s*/?>|</?(?:p|div|tr|h[1-6]|blockquot
 private val CELL_END = Regex("""(?i)</t[dh]>""")
 private val TAG = Regex("<[^>]+>")
 private val HREF = Regex("""(?i)\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
-private val ENTITY = Regex("""&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);""")
+private val ENTITY = Regex("""&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z][a-zA-Z0-9]*);""")
 
 /**
  * [tag] (a pattern ending with `>`) replaced, but only up to the last `>`: a `<` with no `>` after
@@ -136,15 +136,36 @@ private fun spellOutLinks(s: String): String {
     return out.toString()
 }
 
-private val NAMED_ENTITIES = mapOf(
-    "nbsp" to " ", "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
-    "copy" to "©", "reg" to "®", "trade" to "™", "hellip" to "…", "mdash" to "—", "ndash" to "–",
-    "lsquo" to "‘", "rsquo" to "’", "ldquo" to "“", "rdquo" to "”", "euro" to "€", "pound" to "£",
-    "middot" to "·", "bull" to "•", "laquo" to "«", "raquo" to "»", "eacute" to "é", "egrave" to "è",
-    "agrave" to "à", "ccedil" to "ç", "ugrave" to "ù", "ecirc" to "ê", "ocirc" to "ô", "icirc" to "î",
+/** The Latin-1 entities in code point order, from U+00A0 (`&nbsp;`) to U+00FF (`&yuml;`). */
+private val LATIN1_ENTITIES = (
+    "nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr " +
+        "deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest " +
+        "Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml " +
+        "ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig " +
+        "agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml " +
+        "eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml"
+    ).split(' ').mapIndexed { i, name -> name to (0xA0 + i).toChar().toString() }
+
+/**
+ * The named entities mail really uses: all of Latin-1 (accented letters of either case), the
+ * markup ones, and the usual punctuation, spaces, arrows and signs. Names are case-sensitive
+ * (`&Eacute;` is not `&eacute;`). The spaces read as a plain space, and the invisible ones (soft
+ * hyphen, zero-width joiners, direction marks: the filler of a newsletter's preheader) as nothing.
+ */
+private val NAMED_ENTITIES = LATIN1_ENTITIES.toMap() + mapOf(
+    "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
+    "nbsp" to " ", "ensp" to " ", "emsp" to " ", "thinsp" to " ",
+    "shy" to "", "zwnj" to "", "zwj" to "", "lrm" to "", "rlm" to "",
+    "trade" to "™", "hellip" to "…", "mdash" to "—", "ndash" to "–", "minus" to "−",
+    "lsquo" to "‘", "rsquo" to "’", "sbquo" to "‚", "ldquo" to "“", "rdquo" to "”", "bdquo" to "„",
+    "lsaquo" to "‹", "rsaquo" to "›", "bull" to "•", "prime" to "′", "Prime" to "″",
+    "dagger" to "†", "Dagger" to "‡", "permil" to "‰", "euro" to "€",
+    "OElig" to "Œ", "oelig" to "œ", "Scaron" to "Š", "scaron" to "š", "Yuml" to "Ÿ", "circ" to "ˆ", "tilde" to "˜",
+    "larr" to "←", "uarr" to "↑", "rarr" to "→", "darr" to "↓", "harr" to "↔",
+    "ne" to "≠", "le" to "≤", "ge" to "≥", "asymp" to "≈", "infin" to "∞", "hearts" to "♥", "check" to "✓",
 )
 
-/** Numeric (`&#233;`, `&#xE9;`) and the common named entities; unknown ones are left as they are. */
+/** Numeric (`&#233;`, `&#xE9;`) and the named entities of [NAMED_ENTITIES]; unknown ones are left as they are. */
 private fun decodeEntities(s: String): String =
     s.replace(ENTITY) { m ->
         val ref = m.groupValues[1]

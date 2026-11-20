@@ -341,6 +341,63 @@ class DropMailProviderTest {
         assertTrue(cache.load(inbox.key).isEmpty())
         assertNull(prefs.getString("session:${inbox.key}"))
     }
+
+    @Test
+    fun listMessages_restoresToo_whenTheSessionIsNullWithoutAnError() = runBlocking {
+        val prefs = MemoryPrefs()
+        val http = http().onBody("introduceSession(input: {permanentDomainOnly", body(session))
+            .onBody("session(id:", body("""{"data":{"session":null}}"""))
+            .onBody("introduceSession(input: {withAddress: false", body(emptySession))
+            .onBody("restoreAddress", body(restored))
+        val p = provider(http, prefs)
+        val inbox = p.createInbox(null, CreateOptions())
+
+        assertTrue(p.listMessages(inbox).isEmpty())
+        assertTrue(prefs.getString("session:${inbox.key}")!!.contains("0ae8b0151f77f3a3120d97d81cdf42cdd"))
+    }
+
+    @Test
+    fun listMessages_failsWithoutRestoring_whenTheReplyHasNoDataAtAll() = runBlocking {
+        val http = http().onBody("introduceSession(input: {permanentDomainOnly", body(session)).onBody("session(id:", body("{}"))
+        val p = provider(http)
+        val inbox = p.createInbox(null, CreateOptions())
+
+        val e = assertThrows(ProviderException::class.java) { runBlocking { p.listMessages(inbox) } }
+        assertEquals("DropMail.me could not list the inbox", e.message)
+        assertEquals(0, http.calls.count { it.query.contains("restoreAddress") })
+    }
+
+    @Test
+    fun listMessages_doesNotFetchAgainTheMailsTheCacheHadNoRoomFor_untilOneIsDeleted() = runBlocking {
+        // Sixty mails in the session, a minute apart: the cache keeps the fifty newest.
+        val mails = (0 until 60).map { i ->
+            """{"id":"m$i","receivedAt":"2026-09-15T17:${"%02d".format(i)}:00+00:00","fromAddr":"a@example.com","headerFrom":null,""" +
+                """"headerSubject":"S$i","text":"t","html":null,"toAddr":"alxtherxj@10mail.org","toAddrOrig":"alxtherxj@10mail.org"}"""
+        }
+        val http = http().onBody("introduceSession", body(session))
+            .onBody("mails { id receivedAt", body("""{"data":{"session":{"id":"s","mails":[${mails.joinToString(",")}]}}}"""))
+            .onBody("session(id:", body("""{"data":{"session":{"id":"s","mails":[${(0 until 60).joinToString(",") { """{"id":"m$it"}""" }}]}}}"""))
+        val p = provider(http)
+        val inbox = p.createInbox(null, CreateOptions())
+        fun bodyFetches() = http.calls.count { it.query.contains("receivedAt") }
+
+        val first = p.listMessages(inbox)
+        assertEquals(50, first.size)
+        assertEquals("S59", first.first().subject)
+        assertEquals(1, bodyFetches())
+
+        // The ten left out are still listed by the server: their bodies are not downloaded again.
+        assertEquals(first, p.listMessages(inbox))
+        assertEquals(1, bodyFetches())
+
+        // A deletion makes room: the next refresh fetches them, and the newest of them is kept.
+        p.deleteMessage(inbox, first.first())
+        val after = p.listMessages(inbox)
+        assertEquals(2, bodyFetches())
+        assertEquals(50, after.size)
+        assertEquals("S9", after.last().subject)
+        assertTrue(after.none { it.id == "m59" })
+    }
 }
 
 class DropMailCacheRaceTest {
