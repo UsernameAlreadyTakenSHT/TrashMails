@@ -43,7 +43,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
             throw ProviderException(explain(e.body) ?: "tempmail.lol refused to create the address (HTTP ${e.code})")
         }
         if (json.optBoolean("captcha_required")) throw ProviderException("tempmail.lol asks for a captcha right now: try again later")
-        json.text("error")?.let { throw ProviderException("tempmail.lol: $it") }
+        json.text("error")?.let { throw ProviderException(describe(it)) }
         val now = System.currentTimeMillis()
         // The same address may have been removed earlier in this run: its mail is kept again.
         return Inbox(
@@ -71,7 +71,7 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
         } catch (e: HttpException) {
             // An expired (or unknown) token answers 404 {"emails":[],"expired":true} (checked
             // November 2026): read as an empty reply, so what was received stays listed.
-            if (e.code != 404) throw e
+            if (e.code != 404) throw explain(e.body)?.let(::ProviderException) ?: e
             return@withContext cache.load(inbox.key)
         }
         val arr = json.optJSONArray("emails")
@@ -111,5 +111,17 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
 
     /** The `error` line of a failed reply, when there is one. */
     private fun explain(body: String): String? =
-        runCatching { JSONObject(body).optString("error") }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "tempmail.lol: $it" }
+        runCatching { JSONObject(body).optString("error") }.getOrNull()?.takeIf { it.isNotBlank() }?.let(::describe)
+
+    /**
+     * [error] as the app shows it. The free tier is refused, without an account, to whole networks
+     * it saw abused ("your network can only use the API free tier with an account due to consistent
+     * API abuse", November 2026): mobile data behind a shared carrier address and VPNs mostly, while
+     * another connection still works. Said so, since the raw line reads like a fault of the app.
+     */
+    private fun describe(error: String): String =
+        if (error.contains("abuse", ignoreCase = true) || error.contains("with an account", ignoreCase = true)) {
+            "tempmail.lol blocks this network without an account (too much abuse from its address). " +
+                "Try another connection (Wi-Fi instead of mobile data, or without a VPN) or another service."
+        } else "tempmail.lol: $error"
 }

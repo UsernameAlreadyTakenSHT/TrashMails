@@ -55,6 +55,23 @@ class TempmailLolProviderTest {
     }
 
     @Test
+    fun aNetworkBlockedForAbuse_isSaidForWhatItIs() {
+        val refusal = """{"error":"Your network can only use the API free tier with an account due to consistent API abuse"}"""
+        for (step in listOf(httpError(403, refusal), body(refusal))) {
+            val http = FakeHttp().on("/inbox/create", step)
+            val e = assertThrows(ProviderException::class.java) {
+                runBlocking { TempmailLolProvider(http, MessageCache(MemoryPrefs())).createInbox(null, CreateOptions()) }
+            }
+            assertTrue(e.message!!.startsWith("tempmail.lol blocks this network without an account"))
+        }
+        val listing = FakeHttp().on("/inbox?token=", httpError(403, refusal))
+        val e = assertThrows(ProviderException::class.java) {
+            runBlocking { TempmailLolProvider(listing, MessageCache(MemoryPrefs())).listMessages(inbox) }
+        }
+        assertTrue(e.message!!.startsWith("tempmail.lol blocks this network without an account"))
+    }
+
+    @Test
     fun listMessages_keepsWhatTheServerHandedOver_acrossFetches() = runBlocking {
         val cache = MessageCache(MemoryPrefs())
         val http = FakeHttp().on("/inbox?token=", fixture("tempmaillol_inbox"), httpError(404, """{"emails":[],"expired":true}"""))
