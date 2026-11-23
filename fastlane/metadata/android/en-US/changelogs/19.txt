@@ -1,0 +1,2 @@
+- tempmail.lol: an expired address keeps listing the mail it received instead of failing with HTTP 404
+- tempmail.lol: a network the service blocks without an account is explained, with another connection to try

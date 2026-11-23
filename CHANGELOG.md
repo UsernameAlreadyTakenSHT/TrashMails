@@ -1,3 +1,13 @@
+## v0.5.14 — 2026-11-23
+
+Two fixes for tempmail.lol, whose API changed how it answers.
+
+### Fixed
+- **tempmail.lol: an expired address keeps listing the mail it received**: the service now answers an expired inbox with HTTP 404 instead of an empty reply, and the refresh failed with "HTTP 404" instead of showing the kept copy.
+
+### Changed
+- **tempmail.lol: a network blocked without an account is said for what it is**: the service now refuses its free tier to whole networks it saw abused (mobile data behind a shared carrier address, VPNs). Instead of the raw "your network can only use the API free tier with an account…", the app says the network is blocked and suggests another connection (Wi-Fi, no VPN) or another service.
+
 ## v0.5.13 — 2026-11-20
 
 The fixes from a full review of 0.5.12: three that show in everyday use, and a handful of smaller ones.
