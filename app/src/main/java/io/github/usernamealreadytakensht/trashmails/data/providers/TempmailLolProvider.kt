@@ -66,7 +66,14 @@ class TempmailLolProvider(private val http: HttpApi = Http, override val cache: 
         // In the query because the API takes it nowhere else (in an Authorization or any other
         // header it answers "Expected token in query parameter", checked October 2026): it reaches
         // the server's logs, but only over TLS, and no Referer ever carries it.
-        val json = JSONObject(http.get("$BASE/inbox?token=${queryParam(token)}"))
+        val json = try {
+            JSONObject(http.get("$BASE/inbox?token=${queryParam(token)}"))
+        } catch (e: HttpException) {
+            // An expired (or unknown) token answers 404 {"emails":[],"expired":true} (checked
+            // November 2026): read as an empty reply, so what was received stays listed.
+            if (e.code != 404) throw e
+            return@withContext cache.load(inbox.key)
+        }
         val arr = json.optJSONArray("emails")
         // An expired inbox (or a reply without emails) only means nothing new: what was received stays.
         if (arr == null || arr.length() == 0) return@withContext cache.load(inbox.key)

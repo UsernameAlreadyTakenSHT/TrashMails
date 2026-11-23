@@ -57,7 +57,7 @@ class TempmailLolProviderTest {
     @Test
     fun listMessages_keepsWhatTheServerHandedOver_acrossFetches() = runBlocking {
         val cache = MessageCache(MemoryPrefs())
-        val http = FakeHttp().on("/inbox?token=", fixture("tempmaillol_inbox"), body("""{"emails":[],"expired":true}"""))
+        val http = FakeHttp().on("/inbox?token=", fixture("tempmaillol_inbox"), httpError(404, """{"emails":[],"expired":true}"""))
         val provider = TempmailLolProvider(http, cache)
 
         val first = provider.listMessages(inbox)
